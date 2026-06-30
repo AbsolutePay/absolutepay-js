@@ -2,7 +2,7 @@
   "name": "absolutepay",
   "version": "0.1.0",
   "description": "Official AbsolutePay API client for Node.js — payments, payouts, invoices, conversions, off-ramp, gift cards, and signed webhooks.",
-  "license": "LicenseRef-Proprietary",
+  "license": "MIT",
   "type": "module",
   "engines": { "node": ">=18" },
   "files": ["dist", "README.md"],

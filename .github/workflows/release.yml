@@ -32,6 +32,6 @@ jobs:
       # Trusted publishing (OIDC) needs npm >= 11.5.1; Node 22 ships an older npm, so upgrade first.
       - run: npm install -g npm@latest
       # No token — npm authenticates via the GitHub OIDC trusted publisher.
-      # Private repo → skip provenance (it requires a public repo). Drop --no-provenance once public.
+      # Public repo → attach provenance (verifiable build → package supply-chain link).
       - name: Publish to npm (OIDC trusted publisher)
-        run: npm publish --access public --no-provenance
+        run: npm publish --access public --provenance

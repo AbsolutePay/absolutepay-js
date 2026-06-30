@@ -96,4 +96,4 @@ Types track the published OpenAPI contract in `openapi/absolutepay.json` (regene
 
 ## License
 
-Proprietary — © AbsolutePay.
+[MIT](./LICENSE) © AbsolutePay
