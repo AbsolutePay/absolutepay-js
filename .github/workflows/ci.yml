@@ -5,36 +5,9 @@ on:
     branches: [main]
   pull_request:
 
-# GitHub Actions has no native "first available runner" fallback (a `runs-on` list is AND, not OR).
-# So: run on GitHub-hosted first (free + reliable for public repos); if that job can't run or fails,
-# a self-hosted job takes over. `continue-on-error` keeps a hosted failure from failing the whole run,
-# and the overall check is green when EITHER job passes.
-
 jobs:
-  # Primary — GitHub-hosted.
   build:
     runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.14
-      - run: bun install --frozen-lockfile
-      - name: Generated types match the spec
-        run: bun run gen:check
-      - name: Typecheck
-        run: bun run typecheck
-      - name: Test
-        run: bun test
-      - name: Build
-        run: bun run build
-
-  # Fallback — self-hosted, only when the hosted job didn't succeed (unavailable or failed).
-  build-fallback:
-    needs: build
-    if: ${{ needs.build.result == 'failure' }}
-    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
