@@ -1,9 +1,8 @@
 name: Release
 
 # Publishes to npm ONLY when a GitHub Release is published (or via manual dispatch after review).
-# Never runs on a push. Requires the NPM_TOKEN repo secret.
-# (Repo is private → no npm provenance, which would require a public repo. Flip to public + add
-#  `id-token: write` + `--provenance` if you want the supply-chain attestation.)
+# Never runs on a push. Auth = npm Trusted Publisher (OIDC) — NO NPM_TOKEN secret needed.
+# Configure on npmjs → package → Trusted Publisher: Org=AbsolutePay, Repo=absolutepay-js, Workflow=release.yml.
 on:
   release:
     types: [published]
@@ -11,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # OIDC: lets npm verify this workflow as the trusted publisher
 
 jobs:
   publish:
@@ -27,9 +27,11 @@ jobs:
       - run: bun run build
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: https://registry.npmjs.org
-      - name: Publish to npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted publishing (OIDC) needs npm >= 11.5.1; Node 22 ships an older npm, so upgrade first.
+      - run: npm install -g npm@latest
+      # No token — npm authenticates via the GitHub OIDC trusted publisher.
+      # Private repo → skip provenance (it requires a public repo). Drop --no-provenance once public.
+      - name: Publish to npm (OIDC trusted publisher)
+        run: npm publish --access public --no-provenance
