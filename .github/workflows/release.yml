@@ -1,0 +1,35 @@
+name: Release
+
+# Publishes to npm ONLY when a GitHub Release is published (or via manual dispatch after review).
+# Never runs on a push. Requires the NPM_TOKEN repo secret.
+# (Repo is private → no npm provenance, which would require a public repo. Flip to public + add
+#  `id-token: write` + `--provenance` if you want the supply-chain attestation.)
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: bun run gen:check
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun run build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,40 @@
+{
+  "name": "absolutepay",
+  "version": "0.1.0",
+  "description": "Official AbsolutePay API client for Node.js — payments, payouts, invoices, conversions, off-ramp, gift cards, and signed webhooks.",
+  "license": "LicenseRef-Proprietary",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "files": ["dist", "README.md"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "gen": "openapi-typescript openapi/absolutepay.json -o src/generated/openapi.ts",
+    "gen:check": "bun run gen && git diff --exit-code -- src/generated/openapi.ts",
+    "prepublishOnly": "bun run typecheck && bun run test && bun run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "bun-types": "^1.1.0",
+    "openapi-typescript": "^7.4.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  },
+  "repository": { "type": "git", "url": "git+https://github.com/AbsolutePay/absolutepay-js.git" },
+  "homepage": "https://docs.absolutepay.io",
+  "bugs": { "url": "https://github.com/AbsolutePay/absolutepay-js/issues" },
+  "keywords": ["absolutepay", "payments", "crypto", "payouts", "webhooks", "api", "sdk"],
+  "publishConfig": { "access": "public" }
+}
