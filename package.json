@@ -4,7 +4,9 @@
   "description": "Official AbsolutePay API client for Node.js — payments, payouts, invoices, conversions, off-ramp, gift cards, and signed webhooks.",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "files": ["dist", "README.md"],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -30,11 +32,19 @@
     "bun-types": "^1.1.0",
     "openapi-typescript": "^7.4.0",
     "tsup": "^8.3.0",
+    "typedoc": "^0.28.19",
     "typescript": "^5.6.0"
   },
-  "repository": { "type": "git", "url": "git+https://github.com/AbsolutePay/absolutepay-js.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbsolutePay/absolutepay-js.git"
+  },
   "homepage": "https://docs.absolutepay.io",
-  "bugs": { "url": "https://github.com/AbsolutePay/absolutepay-js/issues" },
+  "bugs": {
+    "url": "https://github.com/AbsolutePay/absolutepay-js/issues"
+  },
   "keywords": ["absolutepay", "payments", "crypto", "payouts", "webhooks", "api", "sdk"],
-  "publishConfig": { "access": "public" }
+  "publishConfig": {
+    "access": "public"
+  }
 }

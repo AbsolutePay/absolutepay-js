@@ -1,0 +1,18 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "exclude": ["**/generated/**", "**/*.test.ts", "test/**"],
+  "out": "site",
+  "name": "absolutepay (Node SDK)",
+  "readme": "README.md",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "hideGenerator": true,
+  "navigationLinks": {
+    "npm": "https://www.npmjs.com/package/absolutepay",
+    "GitHub": "https://github.com/AbsolutePay/absolutepay-js",
+    "Guides": "https://docs.absolutepay.io"
+  }
+}

@@ -12,13 +12,30 @@ import { GiftCards } from "./resources/giftcards.js";
 import { OffRamp } from "./resources/offramp.js";
 import { Transactions } from "./resources/transactions.js";
 
+/** HTTP verbs the SDK issues against the API. */
 export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
-/** The transport a resource needs — lets resources stay decoupled from the concrete client (testable). */
+/**
+ * The minimal transport contract a resource depends on — a single `request` method.
+ *
+ * Keeping resources bound to this interface (rather than the concrete {@link AbsolutePay})
+ * decouples them from the HTTP layer, which makes them trivially testable with a stub.
+ */
 export interface Requester {
+  /**
+   * Issue one API call.
+   * @typeParam T - Expected shape of the parsed JSON response.
+   * @param method - HTTP method.
+   * @param path - Path + query string (e.g. `/v1/balances?quote=USDT`).
+   * @param body - Optional request body; JSON-serialized when present.
+   * @param headers - Optional extra headers (e.g. an idempotency key); merged after signing.
+   * @returns The parsed response body as `T`.
+   * @throws {AbsolutePayError} On any non-2xx response.
+   */
   request<T>(method: HttpMethod, path: string, body?: unknown, headers?: Record<string, string>): Promise<T>;
 }
 
+/** Configuration for constructing an {@link AbsolutePay} client. */
 export interface AbsolutePayConfig {
   /** App API key (Bearer). Server-side only — never ship it to a browser. */
   apiKey: string;
@@ -41,7 +58,13 @@ export interface AbsolutePayConfig {
 const PRODUCTION_BASE = "https://api.absolutepay.io";
 const SANDBOX_BASE = "https://sandbox-api.absolutepay.io";
 
-/** Build a `?a=1&b=2` query string from defined values (skips undefined/null). */
+/**
+ * Serialize a params object into a URL query string, URL-encoding keys and values
+ * and skipping any that are `undefined`/`null`.
+ *
+ * @param params - Key/value pairs to encode; nullish values are omitted.
+ * @returns A leading-`?` query string (e.g. `"?a=1&b=2"`), or `""` when nothing remains.
+ */
 export function qs(params: Record<string, unknown>): string {
   const parts = Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== null)
@@ -49,7 +72,27 @@ export function qs(params: Record<string, unknown>): string {
   return parts.length ? `?${parts.join("&")}` : "";
 }
 
-/** The AbsolutePay API client. Compose once and reuse; each resource hangs off it. */
+/**
+ * The AbsolutePay API client — the entry point to the SDK.
+ *
+ * Construct it once with your credentials and reuse the instance; every resource
+ * (payments, payouts, invoices, …) hangs off it as a property. When a `signingSecret`
+ * is configured the client HMAC-signs every request automatically. This is a
+ * SERVER-SIDE client: your API key and signing secret must never reach a browser.
+ *
+ * @example
+ * ```ts
+ * import { AbsolutePay } from "absolutepay";
+ *
+ * const client = new AbsolutePay({
+ *   apiKey: process.env.ABSOLUTEPAY_API_KEY!,
+ *   signingSecret: process.env.ABSOLUTEPAY_SIGNING_SECRET!, // apisign_…
+ *   sandbox: true, // omit / false for production
+ * });
+ *
+ * const balances = await client.balances.list();
+ * ```
+ */
 export class AbsolutePay implements Requester {
   private readonly apiKey: string;
   private readonly signingSecret: string | undefined;
@@ -57,18 +100,34 @@ export class AbsolutePay implements Requester {
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof globalThis.fetch;
 
+  /** Workspace asset balances and FX-valued summary (scope: `balances:read`). */
   readonly balances: Balances;
+  /** Fee previews from the pricing matrix (scope: `balances:read`). */
   readonly fees: Fees;
+  /** Pay-in checkouts / collections (scope: `payments:write`). */
   readonly payments: Payments;
+  /** Batch crypto payouts (scopes: `payouts:write` / `payouts:read`). */
   readonly payouts: Payouts;
+  /** Refunds on settled collections (scope: `payments:write`). */
   readonly refunds: Refunds;
+  /** Asset-to-asset conversions (scope: `convert:write`). */
   readonly conversions: Conversions;
+  /** Invoices and hosted payment links (scopes: `invoices:write` / `invoices:read`). */
   readonly invoices: Invoices;
+  /** Recurring plans and subscriptions (scopes: `subscriptions:write` / `subscriptions:read`). */
   readonly subscriptions: Subscriptions;
+  /** Gift-card issuance and templates (scopes: `balances:read` to read, `payments:write` to issue). */
   readonly giftcards: GiftCards;
+  /** Crypto → fiat off-ramp to a bank account (scopes: `payouts:write` / `payouts:read`). */
   readonly offramp: OffRamp;
+  /** Unified funds ledger and reconciliation export (scope: `ledger:read`). */
   readonly transactions: Transactions;
 
+  /**
+   * Create a client.
+   * @param config - Connection + credential options; see {@link AbsolutePayConfig}.
+   * @throws {Error} If `apiKey` is missing, or if `baseUrl` uses a non-https scheme on a non-localhost host.
+   */
   constructor(config: AbsolutePayConfig) {
     if (!config.apiKey) throw new Error("AbsolutePay: apiKey is required");
     this.apiKey = config.apiKey;
@@ -97,7 +156,21 @@ export class AbsolutePay implements Requester {
     this.transactions = new Transactions(this);
   }
 
-  /** Low-level request. `path` is the path+query (e.g. `/v1/balances?quote=USDT`). Throws AbsolutePayError on non-2xx. */
+  /**
+   * Low-level request primitive used by every resource. Adds the Bearer auth header,
+   * signs the request when a signing secret is set, enforces the configured timeout,
+   * and turns non-2xx responses into {@link AbsolutePayError}. You rarely call this
+   * directly — prefer the typed resource methods — but it is available for endpoints
+   * the SDK does not yet wrap.
+   *
+   * @typeParam T - Expected shape of the parsed JSON response.
+   * @param method - HTTP method.
+   * @param path - Path INCLUDING query string, e.g. `/v1/balances?quote=USDT`.
+   * @param body - Optional request body; JSON-serialized and sent with `content-type: application/json`.
+   * @param extraHeaders - Optional headers merged AFTER signing (e.g. `Idempotency-Key`), so they are not part of the signed canonical string.
+   * @returns The parsed response body as `T` (or `null` when the response has no body).
+   * @throws {AbsolutePayError} On any non-2xx response (401/403 auth, 429 rate limit, etc.).
+   */
   async request<T>(method: HttpMethod, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
     const bodyStr = body !== undefined ? JSON.stringify(body) : "";
     const headers: Record<string, string> = { authorization: `Bearer ${this.apiKey}` };
