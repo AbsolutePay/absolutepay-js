@@ -1,6 +1,6 @@
 import type { Requester } from "../client.js";
 import { qs } from "../client.js";
-import type { Money } from "../types.js";
+import type { Money, Page, PageQuery } from "../types.js";
 
 export interface CreateInvoiceParams {
   reference: string;
@@ -93,7 +93,8 @@ export class Invoices {
     return this.c.request("POST", "/v1/checkouts", params);
   }
 
-  list(query: { limit?: number; status?: string } = {}): Promise<Record<string, unknown>> {
+  /** Keyset-paginated: pass a prior page's `nextCursor` as `before` for the next page. */
+  list(query: PageQuery & { status?: string; kind?: string } = {}): Promise<Page> {
     return this.c.request("GET", `/v1/invoices${qs(query)}`);
   }
 

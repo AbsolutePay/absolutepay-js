@@ -1,5 +1,6 @@
 import type { Requester } from "../client.js";
-import type { Money } from "../types.js";
+import { qs } from "../client.js";
+import type { Money, Page, PageQuery } from "../types.js";
 
 export interface CreatePlanParams {
   merchantPlanNo: string;
@@ -27,8 +28,9 @@ export class Subscriptions {
     return this.c.request("POST", "/v1/subscription-plans", params);
   }
 
-  list(): Promise<Record<string, unknown>> {
-    return this.c.request("GET", "/v1/subscriptions");
+  /** Keyset-paginated: pass a prior page's `nextCursor` as `before` for the next page. */
+  list(query: PageQuery & { status?: string } = {}): Promise<Page> {
+    return this.c.request("GET", `/v1/subscriptions${qs(query)}`);
   }
   create(params: CreateSubscriptionParams): Promise<Record<string, unknown>> {
     return this.c.request("POST", "/v1/subscriptions", params);

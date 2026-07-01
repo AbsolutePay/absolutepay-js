@@ -42,7 +42,7 @@ const PRODUCTION_BASE = "https://api.absolutepay.io";
 const SANDBOX_BASE = "https://sandbox-api.absolutepay.io";
 
 /** Build a `?a=1&b=2` query string from defined values (skips undefined/null). */
-export function qs(params: Record<string, string | number | boolean | undefined | null>): string {
+export function qs(params: Record<string, unknown>): string {
   const parts = Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== null)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);

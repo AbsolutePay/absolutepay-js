@@ -1,4 +1,6 @@
 import type { Requester } from "../client.js";
+import { qs } from "../client.js";
+import type { Page, PageQuery } from "../types.js";
 
 export interface OffRampQuoteParams {
   cryptoCurrency: string;
@@ -32,7 +34,8 @@ export class OffRamp {
   withdraw(params: OffRampWithdrawParams): Promise<Record<string, unknown>> {
     return this.c.request("POST", "/v1/offramp/withdraw", params);
   }
-  orders(): Promise<Record<string, unknown>> {
-    return this.c.request("GET", "/v1/offramp/orders");
+  /** Keyset-paginated: pass a prior page's `nextCursor` as `before` for the next page. */
+  orders(query: PageQuery & { status?: string } = {}): Promise<Page> {
+    return this.c.request("GET", `/v1/offramp/orders${qs(query)}`);
   }
 }

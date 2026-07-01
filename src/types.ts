@@ -4,6 +4,25 @@ export interface Money {
   currency: string;
 }
 
+/** Keyset-pagination query for list endpoints. `before` is the previous page's `nextCursor`. */
+export type PageQuery = {
+  /** Max items per page. */
+  limit?: number;
+  /** Opaque cursor from the previous page's `nextCursor`. Omit for the first page. */
+  before?: string;
+};
+
+/** A page of results from a keyset-paginated list endpoint. */
+export interface Page<T = Record<string, unknown>> {
+  items: T[];
+  /**
+   * Opaque keyset cursor for the NEXT page — a value the API RETURNS, not one you set.
+   * To fetch the next page pass it back as the `before` query option; `null` on the last page.
+   * @example "eyJpZCI6IjAxSlgwUTdBQiIsInRzIjoxNzE5NzkyMDAwMDAwfQ"
+   */
+  nextCursor: string | null;
+}
+
 export type PaymentType = "CHECKOUT" | "WITHDRAWAL" | "SUBSCRIPTION" | "CONVERSION" | "OFFRAMP" | "GIFTCARD";
 
 /** A single asset balance. */

@@ -11,7 +11,7 @@ export { signRequest, canonicalRequest } from "./signing.js";
 export type { SignatureHeaders } from "./signing.js";
 
 // Shared + per-resource types
-export type { Money, PaymentType, Balance, FeePreview } from "./types.js";
+export type { Money, PaymentType, Balance, FeePreview, Page, PageQuery } from "./types.js";
 export type { BalanceSummary } from "./resources/balances.js";
 export type { CreateCheckoutParams, Checkout } from "./resources/payments.js";
 export type { PayoutItem, PayoutBatch, WithdrawOption } from "./resources/payouts.js";
