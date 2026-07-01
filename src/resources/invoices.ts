@@ -152,6 +152,17 @@ class PublicInvoices {
   status(token: string): Promise<InvoiceStatus> {
     return this.c.request("GET", `/v1/public/invoices/${encodeURIComponent(token)}/status`);
   }
+  /**
+   * Record that the payer opened the hosted invoice page (best-effort analytics beacon).
+   *
+   * Fire-and-forget: this has no effect on payment state and can be safely ignored on error.
+   * @param token - The invoice/checkout token.
+   * @returns Nothing on success.
+   * @throws {AbsolutePayError} On failure (e.g. 404 unknown token).
+   */
+  async trackOpen(token: string): Promise<void> {
+    await this.c.request("POST", `/v1/public/invoices/${encodeURIComponent(token)}/open`);
+  }
 }
 
 /** Create and manage invoices + hosted payment links (scopes: `invoices:write` to mutate, `invoices:read` to list). */

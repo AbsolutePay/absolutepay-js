@@ -20,4 +20,4 @@ export type { QuoteParams, ConvertQuote, ConvertOrder } from "./resources/conver
 export type { CreateInvoiceParams, InvoiceCreated, DepositOrder, AssetChain, InvoiceStatus } from "./resources/invoices.js";
 export type { CreatePlanParams, CreateSubscriptionParams } from "./resources/subscriptions.js";
 export type { CreateGiftCardParams } from "./resources/giftcards.js";
-export type { OffRampQuoteParams, OffRampWithdrawParams } from "./resources/offramp.js";
+export type { OffRampQuoteParams, OffRampWithdrawParams, BankRequest, DocFile } from "./resources/offramp.js";

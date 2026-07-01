@@ -11,6 +11,8 @@ import { Subscriptions } from "./resources/subscriptions.js";
 import { GiftCards } from "./resources/giftcards.js";
 import { OffRamp } from "./resources/offramp.js";
 import { Transactions } from "./resources/transactions.js";
+import { Reconciliation } from "./resources/reconciliation.js";
+import { Deposits } from "./resources/deposits.js";
 
 /** HTTP verbs the SDK issues against the API. */
 export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
@@ -122,6 +124,10 @@ export class AbsolutePay implements Requester {
   readonly offramp: OffRamp;
   /** Unified funds ledger and reconciliation export (scope: `ledger:read`). */
   readonly transactions: Transactions;
+  /** Settled pay-in / withdrawal ledgers for reconciliation (scope: `ledger:read`). */
+  readonly reconciliation: Reconciliation;
+  /** Direct crypto deposits into the workspace via permanent addresses (scope: `balances:read`). */
+  readonly deposits: Deposits;
 
   /**
    * Create a client.
@@ -154,6 +160,8 @@ export class AbsolutePay implements Requester {
     this.giftcards = new GiftCards(this);
     this.offramp = new OffRamp(this);
     this.transactions = new Transactions(this);
+    this.reconciliation = new Reconciliation(this);
+    this.deposits = new Deposits(this);
   }
 
   /**

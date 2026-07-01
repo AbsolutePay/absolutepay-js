@@ -12,6 +12,36 @@ export interface OffRampQuoteParams {
   cryptoAmount: string;
 }
 
+/** A document uploaded as base64 (e.g. a bank certificate or passport scan) for off-ramp verification. */
+export interface DocFile {
+  /** Original file name, e.g. `"certificate.pdf"`. Required. */
+  filename: string;
+  /** MIME type, e.g. `"application/pdf"` or `"image/png"`. Required. */
+  contentType: string;
+  /** File contents encoded as a base64 string (no data-URL prefix). Required. */
+  dataBase64: string;
+}
+
+/** Inputs for registering a fiat bank account as an off-ramp destination. */
+export interface BankRequest {
+  /** Account holder name exactly as it appears on the bank record. Required. */
+  bankAccountName: string;
+  /** Name of the receiving bank. Required. */
+  bankName: string;
+  /** Numeric country id of the bank (from {@link OffRamp.countries}). Required. */
+  countryId: number;
+  /** IBAN (or local account number) of the destination account. Required. */
+  iban: string;
+  /** SWIFT/BIC code, when required for the corridor. Optional. */
+  swift?: string;
+  /** Bank/branch address, when required. Optional. */
+  address?: string;
+  /** Remittance line/reference number, when required. Optional. */
+  remittanceLineNumber?: string;
+  /** A supporting document (base64) proving ownership of the account. Required. */
+  file: DocFile;
+}
+
 /** Inputs for executing an off-ramp withdrawal against a quote. */
 export interface OffRampWithdrawParams {
   /** The quote token returned by {@link OffRamp.quote}. Time-limited. Required. */
@@ -42,13 +72,44 @@ export class OffRamp {
   }
   /**
    * List the workspace's registered bank accounts (use an id as {@link OffRampWithdrawParams.bankAccountId}).
-   *
-   * Note: registering a NEW bank account is a multipart upload and is not yet wrapped by this SDK.
    * @returns The bank-accounts payload.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `payouts:read`).
    */
   banks(): Promise<Record<string, unknown>> {
     return this.c.request("GET", "/v1/offramp/banks");
+  }
+  /**
+   * Register a fiat bank account as an off-ramp destination (scope: `payouts:write`). Subject to manual review.
+   * @param params - The bank details + a supporting document; see {@link BankRequest}.
+   * @returns The registered bank `{ bankAccountId, status, ... }`.
+   * @throws {AbsolutePayError} On failure (e.g. 422 invalid details, 401/403 missing `payouts:write`).
+   */
+  registerBank(params: BankRequest): Promise<Record<string, unknown>> {
+    return this.c.request("POST", "/v1/offramp/banks", params);
+  }
+  /**
+   * Delete a registered bank account (scope: `payouts:write`).
+   * @param bankAccountId - Id of the bank account to remove (from {@link OffRamp.banks}).
+   * @returns Nothing on success.
+   * @throws {AbsolutePayError} On failure (e.g. 404 unknown bank, 401/403 missing `payouts:write`).
+   */
+  async deleteBank(bankAccountId: string): Promise<void> {
+    await this.c.request("DELETE", `/v1/offramp/banks/${encodeURIComponent(bankAccountId)}`);
+  }
+  /**
+   * Upload verification materials for a registered bank account (scope: `payouts:write`).
+   * @param bankAccountId - Id of the bank account the documents belong to (from {@link OffRamp.banks}).
+   * @param params - The verification documents (each a base64 {@link DocFile}).
+   * @param params.certificate - One or more certificate documents.
+   * @param params.passport - One or more passport/identity documents.
+   * @returns The updated bank verification payload.
+   * @throws {AbsolutePayError} On failure (e.g. 404 unknown bank, 422 invalid document, 401/403 missing `payouts:write`).
+   */
+  submitBankMaterials(
+    bankAccountId: string,
+    params: { certificate: DocFile[]; passport: DocFile[] },
+  ): Promise<Record<string, unknown>> {
+    return this.c.request("POST", `/v1/offramp/banks/${encodeURIComponent(bankAccountId)}/materials`, params);
   }
   /**
    * Get a firm off-ramp quote (crypto amount → fiat amount + rate/fees). No funds move.
