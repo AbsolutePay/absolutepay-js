@@ -12,6 +12,16 @@ export interface CreateInvoiceParams {
   chain?: string;
 }
 
+export interface CheckoutLink {
+  token: string;
+  /** Hosted page URL to send the payer to. */
+  checkoutUrl?: string;
+  payPath?: string;
+  status: string;
+  expiresAt?: number;
+  [k: string]: unknown;
+}
+
 export interface InvoiceCreated {
   token: string;
   address?: string;
@@ -79,7 +89,7 @@ export class Invoices {
   }
 
   /** Create a hosted checkout link (the payer picks the asset on the page). */
-  createCheckout(params: Omit<CreateInvoiceParams, "chain">): Promise<{ token: string; url?: string; [k: string]: unknown }> {
+  createCheckout(params: Omit<CreateInvoiceParams, "chain">): Promise<CheckoutLink> {
     return this.c.request("POST", "/v1/checkouts", params);
   }
 

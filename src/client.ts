@@ -16,7 +16,7 @@ export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 /** The transport a resource needs — lets resources stay decoupled from the concrete client (testable). */
 export interface Requester {
-  request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T>;
+  request<T>(method: HttpMethod, path: string, body?: unknown, headers?: Record<string, string>): Promise<T>;
 }
 
 export interface AbsolutePayConfig {
@@ -98,11 +98,13 @@ export class AbsolutePay implements Requester {
   }
 
   /** Low-level request. `path` is the path+query (e.g. `/v1/balances?quote=USDT`). Throws AbsolutePayError on non-2xx. */
-  async request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
+  async request<T>(method: HttpMethod, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
     const bodyStr = body !== undefined ? JSON.stringify(body) : "";
     const headers: Record<string, string> = { authorization: `Bearer ${this.apiKey}` };
     if (body !== undefined) headers["content-type"] = "application/json";
     if (this.signingSecret) Object.assign(headers, signRequest(this.signingSecret, method, path, bodyStr));
+    // Extra headers (e.g. Idempotency-Key) are not part of the signed canonical string, so merge after signing.
+    if (extraHeaders) Object.assign(headers, extraHeaders);
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
