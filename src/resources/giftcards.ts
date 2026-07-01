@@ -1,5 +1,6 @@
 import type { Requester } from "../client.js";
-import type { Money } from "../types.js";
+import { qs } from "../client.js";
+import type { Money, Page, PageQuery } from "../types.js";
 
 export interface CreateGiftCardParams {
   title: string;
@@ -14,8 +15,9 @@ export class GiftCards {
   templates(): Promise<Record<string, unknown>> {
     return this.c.request("GET", "/v1/giftcards/templates");
   }
-  list(): Promise<Record<string, unknown>> {
-    return this.c.request("GET", "/v1/giftcards");
+  /** Keyset-paginated: pass a prior page's `nextCursor` as `before` for the next page. */
+  list(query: PageQuery & { status?: string } = {}): Promise<Page> {
+    return this.c.request("GET", `/v1/giftcards${qs(query)}`);
   }
   get(cardNum: string): Promise<Record<string, unknown>> {
     return this.c.request("GET", `/v1/giftcards/${encodeURIComponent(cardNum)}`);
