@@ -7,8 +7,12 @@ export interface CreateRefundParams {
 }
 
 export interface Refund {
-  id: string;
+  merchantTradeNo: string;
+  /** The refund's id — pass to `refunds.get()`. */
+  refundRequestId: string;
   status: string;
+  amount: string;
+  currency: string;
   [k: string]: unknown;
 }
 

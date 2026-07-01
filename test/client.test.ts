@@ -81,6 +81,23 @@ describe("AbsolutePay client", () => {
     expect(e.isAuth).toBe(true);
   });
 
+  it("forwards a payout Idempotency-Key header when given", async () => {
+    const s = stub(202, { merchantBatchNo: "po_1", status: "PROCESSING", subOrders: [] });
+    await client(s).payouts.create(
+      { items: [{ recipientAddress: "0xabc", chain: "MATIC", amount: { amount: "1.00", currency: "USDT" } }] },
+      { idempotencyKey: "batch-001" },
+    );
+    const r = s.last();
+    expect(r.headers["Idempotency-Key"]).toBe("batch-001");
+    expect(r.headers["x-absolutepay-signature"]).toBeTruthy(); // still signed
+  });
+
+  it("omits Idempotency-Key when not given", async () => {
+    const s = stub(202, { merchantBatchNo: "po_1", status: "PROCESSING", subOrders: [] });
+    await client(s).payouts.create({ items: [{ recipientAddress: "0xabc", chain: "MATIC", amount: { amount: "1.00", currency: "USDT" } }] });
+    expect(s.last().headers["Idempotency-Key"]).toBeUndefined();
+  });
+
   it("does not sign when no signing secret is configured", async () => {
     const s = stub(200, []);
     await new AbsolutePay({ apiKey: "ap_test_x", baseUrl: "https://api.test", fetch: s.fetch }).balances.list();

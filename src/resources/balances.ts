@@ -5,7 +5,7 @@ import type { Balance } from "../types.js";
 export interface BalanceSummary {
   quote: string;
   total: string;
-  lines: Array<{ currency: string; amount: string; quoted: string; priced: boolean }>;
+  lines: Array<{ currency: string; available: string; value: string; rate: string; priced: boolean }>;
 }
 
 /** Tenant balances (scope: balances:read). */
