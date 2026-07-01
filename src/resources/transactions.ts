@@ -5,8 +5,10 @@ import { qs } from "../client.js";
 export class Transactions {
   constructor(private readonly c: Requester) {}
 
-  /** List ledger entries, optionally filtered by time range / paginated. */
-  list(query: { startTime?: number; endTime?: number; page?: number; count?: number } = {}): Promise<Record<string, unknown>> {
+  /** List ledger entries. Filter with `from`/`to` (epoch ms); page with `limit`/`offset`. `format=csv` for an export. */
+  list(
+    query: { from?: number; to?: number; limit?: number; offset?: number; currency?: string; format?: "json" | "csv" } = {},
+  ): Promise<Record<string, unknown>> {
     return this.c.request("GET", `/v1/transactions${qs(query)}`);
   }
 }

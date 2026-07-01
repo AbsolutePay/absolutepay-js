@@ -19,7 +19,8 @@ export interface ConvertQuote {
 }
 
 export interface ConvertOrder {
-  gateOrderId: string;
+  /** The conversion order number. */
+  orderId: string;
   status: "SUCCESS" | "FAILED" | "PENDING";
   [k: string]: unknown;
 }
