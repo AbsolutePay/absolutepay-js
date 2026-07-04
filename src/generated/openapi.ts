@@ -92,43 +92,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/checkout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Hosted pay-in order
-         * @description Body requires amount, chain, merchantUserId, goodsName (terminalType/expiresIn optional). Response carries prepayId, paymentUrl, qrContent, and the per-order on-chain address.
-         */
-        post: operations["createCheckout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/checkout/{merchantTradeNo}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Poll an order's status */
-        get: operations["getCheckout"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/refunds": {
         parameters: {
             query?: never;
@@ -717,48 +680,6 @@ export interface components {
              */
             total: string;
             lines: components["schemas"]["BalanceLine"][];
-        };
-        CheckoutRequest: {
-            /** @description auto-generated if omitted */
-            merchantTradeNo?: string;
-            amount: components["schemas"]["Money"];
-            /**
-             * @description settlement chain (see supported chains)
-             * @example TRX
-             */
-            chain: string;
-            /**
-             * Format: int64
-             * @description end-customer id on your platform
-             */
-            merchantUserId: number;
-            goodsName: string;
-            /** @enum {string} */
-            terminalType?: "WEB" | "APP" | "WAP" | "MINIAPP" | "OTHERS";
-            /** @description seconds; clamped to a max of 1h */
-            expiresIn?: number;
-            /**
-             * @description pay-in UX (default redirect)
-             * @enum {string}
-             */
-            method?: "redirect" | "web" | "qr";
-        };
-        CheckoutOrder: {
-            prepayId: string;
-            merchantTradeNo: string;
-            /** @example PENDING */
-            status: string;
-            /** @description gross order amount (from order/query) */
-            amount?: components["schemas"]["Money"];
-            paymentUrl?: string;
-            qrContent?: string;
-            /** @description per-order on-chain receiving address */
-            address?: string;
-            /**
-             * Format: int64
-             * @description UTC ms
-             */
-            expireTime?: number;
         };
         WithdrawOption: {
             currency: string;
@@ -1391,58 +1312,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
-        };
-    };
-    createCheckout: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Retry-safe key — drives merchantTradeNo so a re-POST returns the same order, not a duplicate. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CheckoutRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CheckoutOrder"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    getCheckout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                merchantTradeNo: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CheckoutOrder"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
         };
     };
     createRefund: {

@@ -2,7 +2,6 @@ import { AbsolutePayError } from "./errors.js";
 import { signRequest } from "./signing.js";
 import { Balances } from "./resources/balances.js";
 import { Fees } from "./resources/fees.js";
-import { Payments } from "./resources/payments.js";
 import { Payouts } from "./resources/payouts.js";
 import { Refunds } from "./resources/refunds.js";
 import { Conversions } from "./resources/conversions.js";
@@ -78,7 +77,7 @@ export function qs(params: Record<string, unknown>): string {
  * The AbsolutePay API client — the entry point to the SDK.
  *
  * Construct it once with your credentials and reuse the instance; every resource
- * (payments, payouts, invoices, …) hangs off it as a property. When a `signingSecret`
+ * (balances, payouts, invoices, …) hangs off it as a property. When a `signingSecret`
  * is configured the client HMAC-signs every request automatically. This is a
  * SERVER-SIDE client: your API key and signing secret must never reach a browser.
  *
@@ -106,8 +105,6 @@ export class AbsolutePay implements Requester {
   readonly balances: Balances;
   /** Fee previews from the pricing matrix (scope: `balances:read`). */
   readonly fees: Fees;
-  /** Pay-in checkouts / collections (scope: `payments:write`). */
-  readonly payments: Payments;
   /** Batch crypto payouts (scopes: `payouts:write` / `payouts:read`). */
   readonly payouts: Payouts;
   /** Refunds on settled collections (scope: `payments:write`). */
@@ -151,7 +148,6 @@ export class AbsolutePay implements Requester {
 
     this.balances = new Balances(this);
     this.fees = new Fees(this);
-    this.payments = new Payments(this);
     this.payouts = new Payouts(this);
     this.refunds = new Refunds(this);
     this.conversions = new Conversions(this);
