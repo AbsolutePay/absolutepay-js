@@ -889,6 +889,11 @@ export interface components {
             /** @description optional — when set, the deposit address is minted up front for this network (invoice flow) and the response is InvoiceWithAddress instead of Invoice */
             chain?: string;
             /**
+             * Format: uri
+             * @description optional http(s) return URL — once the hosted checkout reaches a terminal state the payer's browser is sent here with ?token=<token>&status=<SUCCESS|EXPIRED|CANCELED> appended (existing query preserved)
+             */
+            redirectUrl?: string;
+            /**
              * @description which manager owns it; defaults to invoice
              * @default invoice
              * @enum {string}
@@ -945,6 +950,11 @@ export interface components {
             description?: string;
             /** @description set if you passed one on create */
             customerEmail?: string;
+            /**
+             * Format: uri
+             * @description echoed if set on create — where the payer's browser is returned after the hosted checkout reaches a terminal state
+             */
+            redirectUrl?: string;
             /** @enum {string} */
             status: "OPEN" | "PAID" | "EXPIRED" | "VOID";
             txId?: string;
@@ -972,6 +982,11 @@ export interface components {
             reference: string;
             amount: components["schemas"]["Money"];
             description?: string;
+            /**
+             * Format: uri
+             * @description echoed if set on create — where the payer's browser is returned after the hosted checkout reaches a terminal state
+             */
+            redirectUrl?: string;
             /** @enum {string} */
             status: "OPEN" | "PAID" | "EXPIRED" | "VOID";
             paused: boolean;

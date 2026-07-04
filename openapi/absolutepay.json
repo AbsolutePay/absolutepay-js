@@ -782,6 +782,11 @@
             "type": "string",
             "description": "optional — when set, the deposit address is minted up front for this network (invoice flow) and the response is InvoiceWithAddress instead of Invoice"
           },
+          "redirectUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "optional http(s) return URL — once the hosted checkout reaches a terminal state the payer's browser is sent here with ?token=<token>&status=<SUCCESS|EXPIRED|CANCELED> appended (existing query preserved)"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -911,6 +916,11 @@
             "type": "string",
             "description": "set if you passed one on create"
           },
+          "redirectUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "echoed if set on create — where the payer's browser is returned after the hosted checkout reaches a terminal state"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -983,6 +993,11 @@
           },
           "description": {
             "type": "string"
+          },
+          "redirectUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "echoed if set on create — where the payer's browser is returned after the hosted checkout reaches a terminal state"
           },
           "status": {
             "type": "string",

@@ -16,6 +16,12 @@ export interface CreateInvoiceParams {
   expiresAt?: number;
   /** When set, mint the deposit address up front for this network (fixed-asset invoice flow), e.g. `"TRON"`. Omit to let the payer pick the asset. */
   chain?: string;
+  /**
+   * Optional http(s) URL to return the payer to once the hosted checkout reaches a terminal state.
+   * The browser is redirected with `?token=<invoiceToken>&status=<SUCCESS|EXPIRED|CANCELED>` appended
+   * (any existing query on the URL is preserved).
+   */
+  redirectUrl?: string;
 }
 
 /** A created hosted checkout link (payer picks the asset on the page). Extra fields may be present. */
@@ -48,6 +54,8 @@ export interface InvoiceCreated {
   amount?: string;
   /** Expiry as epoch milliseconds, when set. */
   expireTime?: number;
+  /** Return URL echoed back when supplied on create — where the payer is sent after the checkout reaches a terminal state. */
+  redirectUrl?: string;
   /** Additional provider-specific fields passed through untyped. */
   [k: string]: unknown;
 }

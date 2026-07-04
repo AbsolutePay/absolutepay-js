@@ -40,6 +40,7 @@ const invoice = await ap.invoices.create({
   reference: "order-123",
   amount: { amount: "25.00", currency: "USDT" },
   chain: "MATIC", // mint a deposit address up front
+  redirectUrl: "https://shop.example.com/thanks", // payer returns here with ?token=…&status=… when done
 });
 console.log(invoice.token, invoice.address);
 ```

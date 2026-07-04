@@ -65,6 +65,20 @@ describe("AbsolutePay client", () => {
     expect(r2.headers["content-type"]).toBe("application/json");
   });
 
+  it("sends redirectUrl in the invoice body when provided, omits it when not", async () => {
+    const withRedirect = stub(201, { token: "inv_2" });
+    await client(withRedirect).invoices.create({
+      reference: "r2",
+      amount: { amount: "1.00", currency: "USDT" },
+      redirectUrl: "https://shop.example.com/thanks",
+    });
+    expect(JSON.parse(withRedirect.last().body ?? "{}")).toMatchObject({ reference: "r2", redirectUrl: "https://shop.example.com/thanks" });
+
+    const withoutRedirect = stub(201, { token: "inv_3" });
+    await client(withoutRedirect).invoices.create({ reference: "r3", amount: { amount: "1.00", currency: "USDT" } });
+    expect(JSON.parse(withoutRedirect.last().body ?? "{}")).not.toHaveProperty("redirectUrl");
+  });
+
   it("maps a non-2xx problem+json into AbsolutePayError", async () => {
     const s = stub(403, { code: "forbidden", title: "requires invoices:read" });
     const c = client(s);
