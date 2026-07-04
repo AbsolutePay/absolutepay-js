@@ -50,7 +50,6 @@ console.log(invoice.token, invoice.address);
 |---|---|
 | `ap.balances` | `list()`, `summary({ quote })` |
 | `ap.fees` | `preview({ amount, currency, paymentType? })` |
-| `ap.payments` | `createCheckout(...)`, `getCheckout(no)` |
 | `ap.payouts` | `create({ items })`, `options({ currency })`, `get(id)` |
 | `ap.refunds` | `create(...)`, `get(id)` |
 | `ap.conversions` | `quote(...)`, `execute(...)`, `convert(...)` |
@@ -59,6 +58,27 @@ console.log(invoice.token, invoice.address);
 | `ap.giftcards` | `templates()`, `list()`, `get(num)`, `create(...)` |
 | `ap.offramp` | `countries()`, `banks(...)`, `quote(...)`, `withdraw(...)`, `orders()` |
 | `ap.transactions` | `list({ startTime, endTime, page, count })` |
+
+### Hosted pay-in checkout
+
+To collect a payment, create a **hosted checkout link** and send the payer to it — they pick the
+asset/chain on the hosted `/pay/<token>` page:
+
+```ts
+const checkout = await ap.invoices.createCheckout({
+  reference: "order-123",
+  amount: { amount: "25.00", currency: "USDT" },
+});
+// → { token, checkoutUrl }
+console.log(checkout.checkoutUrl); // redirect the payer here
+```
+
+Confirm the payment via the `payment.succeeded` webhook (see below) or by polling
+`ap.invoices.public.status(token)`.
+
+> **Removed in 0.4.0:** `ap.payments.createCheckout(...)` / `ap.payments.getCheckout(...)` (the singular
+> `POST /v1/checkout` "hosted pay-in order"). The endpoint no longer exists — migrate to
+> `ap.invoices.createCheckout(...)` above.
 
 ## Webhooks
 
