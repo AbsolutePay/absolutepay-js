@@ -60,34 +60,6 @@ export interface InvoiceCreated {
   [k: string]: unknown;
 }
 
-/** A concrete deposit instruction for a payer who chose an asset/chain on a hosted invoice. */
-export interface DepositOrder {
-  /** Wallet address the payer must send to. */
-  address: string;
-  /** Exact amount to send, as a decimal string. */
-  payAmount: string;
-  /** Asset to send, when reported. */
-  payCurrency?: string;
-  /** Network to send over, when reported. */
-  chain?: string;
-  /** Destination memo/tag, when the chain requires one. */
-  memo?: string;
-  /** Deposit window expiry as epoch milliseconds, when set. */
-  expireTime?: number;
-  /** Additional provider-specific fields passed through untyped. */
-  [k: string]: unknown;
-}
-
-/** One asset+network the payer can choose to pay a hosted invoice with. */
-export interface AssetChain {
-  /** Asset code, e.g. `"USDT"`. */
-  currency: string;
-  /** Network for that asset, e.g. `"TRON"`. */
-  chain: string;
-  /** Composite currency+network identifier expected by `Invoices.public.deposit()`. */
-  fullCurrType: string;
-}
-
 /** Live status of a hosted invoice/deposit. Extra fields may be present. */
 export interface InvoiceStatus {
   /** Current status string (e.g. open/paid/expired). */
@@ -101,81 +73,29 @@ export interface InvoiceStatus {
 }
 
 /**
- * Public (NO-auth) payer-facing endpoints for a hosted invoice/checkout page.
+ * Public (NO-auth) payer-facing endpoint for a hosted invoice/checkout page.
  *
- * These are keyed by the invoice `token` (not your API key) and are what a payer's
- * browser/app calls to pick an asset, get a deposit address, and poll status.
+ * Keyed by the invoice `token` (not your API key). This is the recommended
+ * settlement-confirmation fallback to the `payment.succeeded` webhook — poll it
+ * to observe when a hosted checkout reaches a terminal state.
  * Accessed via {@link Invoices.public}.
  */
 class PublicInvoices {
   constructor(private readonly c: Requester) {}
   /**
-   * Fetch the public invoice document for the hosted page.
-   * @param token - The invoice/checkout token.
-   * @returns The public invoice payload.
-   * @throws {AbsolutePayError} On failure (e.g. 404 unknown/expired token).
-   */
-  get(token: string): Promise<Record<string, unknown>> {
-    return this.c.request("GET", `/v1/public/invoices/${encodeURIComponent(token)}`);
-  }
-  /**
-   * List the asset/chain options the payer can pay this invoice with.
-   * @param token - The invoice/checkout token.
-   * @returns An array of {@link AssetChain} choices.
-   * @throws {AbsolutePayError} On failure (e.g. 404 unknown token).
-   */
-  assets(token: string): Promise<AssetChain[]> {
-    return this.c.request("GET", `/v1/public/invoices/${encodeURIComponent(token)}/assets`);
-  }
-  /**
-   * Create a deposit order once the payer has chosen an asset/chain, yielding an address to pay.
-   * @param token - The invoice/checkout token.
-   * @param params - The chosen asset.
-   * @param params.currency - Asset code (from {@link AssetChain.currency}).
-   * @param params.chain - Network (from {@link AssetChain.chain}).
-   * @param params.fullCurrType - Composite identifier (from {@link AssetChain.fullCurrType}).
-   * @returns A {@link DepositOrder} with the address + exact amount.
-   * @throws {AbsolutePayError} On failure (e.g. 404 unknown token, 422 unsupported asset).
-   */
-  deposit(token: string, params: { currency: string; chain: string; fullCurrType: string }): Promise<DepositOrder> {
-    return this.c.request("POST", `/v1/public/invoices/${encodeURIComponent(token)}/deposit`, params);
-  }
-  /**
-   * Quote how much of a chosen asset is needed to settle the invoice (FX preview).
-   * @param token - The invoice/checkout token.
-   * @param params - Options.
-   * @param params.currency - Asset code to price the invoice in.
-   * @returns The quote payload (amount in the chosen asset + rate).
-   * @throws {AbsolutePayError} On failure (e.g. 404 unknown token).
-   */
-  quote(token: string, params: { currency: string }): Promise<Record<string, unknown>> {
-    return this.c.request("POST", `/v1/public/invoices/${encodeURIComponent(token)}/quote`, params);
-  }
-  /**
-   * Poll the live payment status of a hosted invoice (for the payer's page).
-   * @param token - The invoice/checkout token.
+   * Poll the live payment status of a hosted invoice.
+   * @param token - The invoice/checkout token (from {@link CheckoutLink.token}).
    * @returns The current {@link InvoiceStatus}.
    * @throws {AbsolutePayError} On failure (e.g. 404 unknown token).
    */
   status(token: string): Promise<InvoiceStatus> {
     return this.c.request("GET", `/v1/public/invoices/${encodeURIComponent(token)}/status`);
   }
-  /**
-   * Record that the payer opened the hosted invoice page (best-effort analytics beacon).
-   *
-   * Fire-and-forget: this has no effect on payment state and can be safely ignored on error.
-   * @param token - The invoice/checkout token.
-   * @returns Nothing on success.
-   * @throws {AbsolutePayError} On failure (e.g. 404 unknown token).
-   */
-  async trackOpen(token: string): Promise<void> {
-    await this.c.request("POST", `/v1/public/invoices/${encodeURIComponent(token)}/open`);
-  }
 }
 
 /** Create and manage invoices + hosted payment links (scopes: `invoices:write` to mutate, `invoices:read` to list). */
 export class Invoices {
-  /** Public payer-facing endpoints (no API key needed) — the `PublicInvoices` sub-resource. */
+  /** Public payer-facing endpoint (no API key needed) — the `PublicInvoices` sub-resource (`public.status`). */
   readonly public: PublicInvoices;
   constructor(private readonly c: Requester) {
     this.public = new PublicInvoices(c);

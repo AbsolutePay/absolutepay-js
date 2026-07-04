@@ -16,7 +16,7 @@ export type { BalanceSummary } from "./resources/balances.js";
 export type { PayoutItem, PayoutBatch, WithdrawOption } from "./resources/payouts.js";
 export type { CreateRefundParams, Refund } from "./resources/refunds.js";
 export type { QuoteParams, ConvertQuote, ConvertOrder } from "./resources/conversions.js";
-export type { CreateInvoiceParams, InvoiceCreated, DepositOrder, AssetChain, InvoiceStatus } from "./resources/invoices.js";
+export type { CreateInvoiceParams, InvoiceCreated, InvoiceStatus } from "./resources/invoices.js";
 export type { CreatePlanParams, CreateSubscriptionParams } from "./resources/subscriptions.js";
 export type { CreateGiftCardParams } from "./resources/giftcards.js";
 export type { OffRampQuoteParams, OffRampWithdrawParams, BankRequest, DocFile } from "./resources/offramp.js";

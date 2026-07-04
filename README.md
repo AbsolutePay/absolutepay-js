@@ -54,7 +54,7 @@ console.log(invoice.token, invoice.address);
 | `ap.payouts` | `create({ items })`, `options({ currency })`, `get(id)` |
 | `ap.refunds` | `create(...)`, `get(id)` |
 | `ap.conversions` | `quote(...)`, `execute(...)`, `convert(...)` |
-| `ap.invoices` | `create(...)`, `createCheckout(...)`, `list()`, `stats()`, `pause`, `void`, `ap.invoices.public.*` |
+| `ap.invoices` | `create(...)`, `createCheckout(...)`, `list()`, `stats()`, `pause`, `void`, `public.status(token)` |
 | `ap.subscriptions` | `listPlans()`, `createPlan(...)`, `list()`, `create(...)`, `deductions(no)`, `cancel(no)` |
 | `ap.giftcards` | `templates()`, `list()`, `get(num)`, `create(...)` |
 | `ap.offramp` | `countries()`, `banks(...)`, `quote(...)`, `withdraw(...)`, `orders()` |
