@@ -1,6 +1,7 @@
 import type { Requester } from "../client.js";
 import { qs } from "../client.js";
-import type { Money } from "../types.js";
+import type { IdempotencyOptions, Money, Page } from "../types.js";
+import { idempotencyHeaders } from "../types.js";
 
 /** One recipient line within a batch payout. */
 export interface PayoutItem {
@@ -70,19 +71,18 @@ export class Payouts {
    * );
    * ```
    */
-  create(params: { items: PayoutItem[] }, opts: { idempotencyKey?: string } = {}): Promise<PayoutBatch> {
-    const headers = opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : undefined;
-    return this.c.request("POST", "/v1/payouts", params, headers);
+  create(params: { items: PayoutItem[] }, opts: IdempotencyOptions = {}): Promise<PayoutBatch> {
+    return this.c.request("POST", "/v1/payouts", params, idempotencyHeaders(opts));
   }
 
   /**
    * List the chains a currency can be paid out on, with each chain's fee and min/max limits.
    * @param params - Options.
    * @param params.currency - Currency/asset code to look up, e.g. `"USDT"`. Required.
-   * @returns An object with an `options` array of {@link WithdrawOption}.
+   * @returns The raw `{ items, nextCursor }` (nextCursor always `null`) of {@link WithdrawOption}.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `payouts:read`).
    */
-  options(params: { currency: string }): Promise<{ options: WithdrawOption[] }> {
+  options(params: { currency: string }): Promise<Page<WithdrawOption>> {
     return this.c.request("GET", `/v1/payouts/options${qs({ currency: params.currency })}`);
   }
 

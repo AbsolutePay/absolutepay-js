@@ -1,5 +1,8 @@
 import type { Requester } from "../client.js";
-import type { Money } from "../types.js";
+import { qs } from "../client.js";
+import type { IdempotencyOptions, Money } from "../types.js";
+import { idempotencyHeaders } from "../types.js";
+import type { LedgerPage, LedgerQuery } from "./refunds.js";
 
 /** Inputs for requesting a conversion quote. Specify EXACTLY ONE of `sellAmount` / `buyAmount`. */
 export interface QuoteParams {
@@ -35,6 +38,10 @@ export interface ConvertOrder {
   orderId: string;
   /** Terminal/interim status: `"SUCCESS"`, `"FAILED"`, or `"PENDING"`. */
   status: "SUCCESS" | "FAILED" | "PENDING";
+  /** Exact sell {@link Money} debited. */
+  sell?: Money;
+  /** Exact buy {@link Money} credited. */
+  buy?: Money;
   /** Additional provider-specific fields passed through untyped. */
   [k: string]: unknown;
 }
@@ -59,33 +66,29 @@ export class Conversions {
    * @param params.quoteId - The `quoteId` from the quote. Required, and must not have expired.
    * @param params.sell - The exact sell {@link Money} from the quote (`sellAmount` + `sellCurrency`).
    * @param params.buy - The exact buy {@link Money} from the quote (`buyAmount` + `buyCurrency`).
+   * @param opts - Optional `{ idempotencyKey }` — retrying with the same key + body replays the original.
    * @returns The resulting {@link ConvertOrder}.
    * @throws {AbsolutePayError} On failure (e.g. 409/422 expired or mismatched quote, 401/403 auth).
+   * @example
+   * ```ts
+   * const q = await client.conversions.quote({ sellCurrency: "USDT", buyCurrency: "USDC", sellAmount: "100.00" });
+   * const order = await client.conversions.execute(
+   *   { quoteId: q.quoteId, sell: { amount: q.sellAmount, currency: q.sellCurrency }, buy: { amount: q.buyAmount, currency: q.buyCurrency } },
+   *   { idempotencyKey: crypto.randomUUID() },
+   * );
+   * ```
    */
-  execute(params: { quoteId: string; sell: Money; buy: Money }): Promise<ConvertOrder> {
-    return this.c.request("POST", "/v1/conversions", params);
+  execute(params: { quoteId: string; sell: Money; buy: Money }, opts: IdempotencyOptions = {}): Promise<ConvertOrder> {
+    return this.c.request("POST", "/v1/conversions", params, idempotencyHeaders(opts));
   }
 
   /**
-   * Convenience: quote and immediately execute in one call, using the quote's exact amounts.
-   * @param params - What to convert; see {@link QuoteParams}.
-   * @returns The resulting {@link ConvertOrder}.
-   * @throws {AbsolutePayError} If either the quote or the execute step fails.
-   * @example
-   * ```ts
-   * const order = await client.conversions.convert({
-   *   sellCurrency: "USDT",
-   *   buyCurrency: "USDC",
-   *   sellAmount: "100.00",
-   * });
-   * ```
+   * List the settled CONVERT ledger history (scope: `convert:read`). Keyset-paginated.
+   * @param query - Time window + asset filter + pagination; see {@link LedgerQuery}.
+   * @returns The raw `{ items, total, nextCursor }` — a {@link LedgerPage}.
+   * @throws {AbsolutePayError} On failure (e.g. 401/403 auth).
    */
-  async convert(params: QuoteParams): Promise<ConvertOrder> {
-    const q = await this.quote(params);
-    return this.execute({
-      quoteId: q.quoteId,
-      sell: { amount: q.sellAmount, currency: q.sellCurrency },
-      buy: { amount: q.buyAmount, currency: q.buyCurrency },
-    });
+  list(query: LedgerQuery = {}): Promise<LedgerPage> {
+    return this.c.request("GET", `/v1/conversions${qs(query)}`);
   }
 }

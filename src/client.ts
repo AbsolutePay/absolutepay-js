@@ -5,11 +5,11 @@ import { Fees } from "./resources/fees.js";
 import { Payouts } from "./resources/payouts.js";
 import { Refunds } from "./resources/refunds.js";
 import { Conversions } from "./resources/conversions.js";
+import { Checkouts } from "./resources/checkouts.js";
 import { Invoices } from "./resources/invoices.js";
 import { Subscriptions } from "./resources/subscriptions.js";
 import { GiftCards } from "./resources/giftcards.js";
 import { OffRamp } from "./resources/offramp.js";
-import { Transactions } from "./resources/transactions.js";
 import { Reconciliation } from "./resources/reconciliation.js";
 import { Deposits } from "./resources/deposits.js";
 
@@ -109,9 +109,11 @@ export class AbsolutePay implements Requester {
   readonly payouts: Payouts;
   /** Refunds on settled collections (scope: `payments:write`). */
   readonly refunds: Refunds;
-  /** Asset-to-asset conversions (scope: `convert:write`). */
+  /** Asset-to-asset conversions + settled convert history (scopes: `convert:write` / `convert:read`). */
   readonly conversions: Conversions;
-  /** Invoices and hosted payment links (scopes: `invoices:write` / `invoices:read`). */
+  /** Hosted checkout links — payer picks the asset/chain (scopes: `invoices:write` / `invoices:read`). */
+  readonly checkouts: Checkouts;
+  /** Invoices — up-front fixed-address flow (scopes: `invoices:write` / `invoices:read`). */
   readonly invoices: Invoices;
   /** Recurring plans and subscriptions (scopes: `subscriptions:write` / `subscriptions:read`). */
   readonly subscriptions: Subscriptions;
@@ -119,11 +121,9 @@ export class AbsolutePay implements Requester {
   readonly giftcards: GiftCards;
   /** Crypto → fiat off-ramp to a bank account (scopes: `payouts:write` / `payouts:read`). */
   readonly offramp: OffRamp;
-  /** Unified funds ledger and reconciliation export (scope: `ledger:read`). */
-  readonly transactions: Transactions;
   /** Settled pay-in / withdrawal ledgers for reconciliation (scope: `ledger:read`). */
   readonly reconciliation: Reconciliation;
-  /** Direct crypto deposits into the workspace via permanent addresses (scope: `balances:read`). */
+  /** Own-balance deposit addresses + settled deposit history (scope: `balances:read`). */
   readonly deposits: Deposits;
 
   /**
@@ -151,11 +151,11 @@ export class AbsolutePay implements Requester {
     this.payouts = new Payouts(this);
     this.refunds = new Refunds(this);
     this.conversions = new Conversions(this);
+    this.checkouts = new Checkouts(this);
     this.invoices = new Invoices(this);
     this.subscriptions = new Subscriptions(this);
     this.giftcards = new GiftCards(this);
     this.offramp = new OffRamp(this);
-    this.transactions = new Transactions(this);
     this.reconciliation = new Reconciliation(this);
     this.deposits = new Deposits(this);
   }

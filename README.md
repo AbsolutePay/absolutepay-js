@@ -34,52 +34,77 @@ const ap = new AbsolutePay({
   // baseUrl: "https://…",         // optional: override the origin entirely (wins over `sandbox`)
 });
 
-const balances = await ap.balances.list();
+const { items: balances } = await ap.balances.list();
 const preview = await ap.fees.preview({ amount: "100", currency: "USDT" });
-const invoice = await ap.invoices.create({
+
+// Hosted checkout — the payer picks the asset/chain on the /pay/<token> page:
+const checkout = await ap.checkouts.create({
   reference: "order-123",
   amount: { amount: "25.00", currency: "USDT" },
-  chain: "MATIC", // mint a deposit address up front
   redirectUrl: "https://shop.example.com/thanks", // payer returns here with ?token=…&status=… when done
 });
-console.log(invoice.token, invoice.address);
+console.log(checkout.checkoutUrl); // redirect the payer here
 ```
+
+## Conventions
+
+- **Lists** take `{ limit?, before?, order?, ...filters }` and return the raw `{ items, nextCursor }`.
+  Page forward by echoing `nextCursor` back as `before`; `nextCursor: null` is the last page. The
+  ledger-history lists (`refunds.list`, `conversions.list`, `reconciliation.*`) also carry `total`.
+- **Money POSTs** accept a second `{ idempotencyKey }` argument that sets the `Idempotency-Key` header —
+  retrying with the same key + body replays the original response (a different body returns `409`).
+  Applies to `payouts.create`, `refunds.create`, `conversions.execute`, `offramp.withdraw`,
+  `giftcards.create`, `subscriptions.create`, `subscriptions.plans.create`.
+- **Errors** parse the `{ code, title, detail }` body into `AbsolutePayError`.
 
 ## Resources
 
 | Namespace | Highlights |
 |---|---|
-| `ap.balances` | `list()`, `summary({ quote })` |
+| `ap.balances` | `list()` → `{ items }` |
 | `ap.fees` | `preview({ amount, currency, paymentType? })` |
-| `ap.payouts` | `create({ items })`, `options({ currency })`, `get(id)` |
-| `ap.refunds` | `create(...)`, `get(id)` |
-| `ap.conversions` | `quote(...)`, `execute(...)`, `convert(...)` |
-| `ap.invoices` | `create(...)`, `createCheckout(...)`, `list()`, `stats()`, `pause`, `void`, `public.status(token)` |
-| `ap.subscriptions` | `listPlans()`, `createPlan(...)`, `list()`, `create(...)`, `deductions(no)`, `cancel(no)` |
-| `ap.giftcards` | `templates()`, `list()`, `get(num)`, `create(...)` |
-| `ap.offramp` | `countries()`, `banks(...)`, `quote(...)`, `withdraw(...)`, `orders()` |
-| `ap.transactions` | `list({ startTime, endTime, page, count })` |
+| `ap.checkouts` | `create(...)`, `list(query)`, `get(token)`, `update(token, patch)`, `del(token)` |
+| `ap.invoices` | `create(...)` (**`chain` required**), `list(query)`, `get(token)`, `update(token, patch)`, `del(token)` |
+| `ap.deposits` | `chains()`, `createAddress({ chain })`, `addresses(query)`, `getAddress(chain)`, `list(query)` |
+| `ap.payouts` | `create(items, { idempotencyKey? })`, `options({ currency })`, `get(id)` |
+| `ap.refunds` | `create(..., { idempotencyKey? })`, `get(id)`, `list(query)` |
+| `ap.conversions` | `quote(...)`, `execute(..., { idempotencyKey? })`, `list(query)` |
+| `ap.subscriptions` | `create(..., { idempotencyKey? })`, `list(query)`, `deductions(no)`, `cancel(no)`, `plans.list()`, `plans.create(..., { idempotencyKey? })` |
+| `ap.giftcards` | `templates()`, `list(query)`, `get(num)`, `create(..., { idempotencyKey? })` |
+| `ap.offramp` | `countries()`, `banks()`, `registerBank(...)`, `removeBank(id)`, `quote(...)`, `withdraw(..., { idempotencyKey? })`, `orders(query)` |
+| `ap.reconciliation` | `payments(query)`, `withdrawals(query)` → `{ items, total, nextCursor }` |
 
-### Hosted pay-in checkout
+### Checkouts vs invoices
 
-To collect a payment, create a **hosted checkout link** and send the payer to it — they pick the
-asset/chain on the hosted `/pay/<token>` page:
+- **`ap.checkouts`** — a hosted link where the payer picks the asset/chain on the `/pay/<token>` page.
+  `create(...)` returns `{ token, checkoutUrl }`.
+- **`ap.invoices`** — the up-front flow: pass the required `chain` and the deposit `address` is minted
+  immediately. `create(...)` returns `{ token, address, chain, currency, amount }`.
+
+Both support the same `list` / `get` / `update` / `del` CRUD (update patches `paused` /
+`redirectUrl` / `expiresAt` / `description`; send `null` to clear a field; `del` voids the link).
 
 ```ts
-const checkout = await ap.invoices.createCheckout({
+const invoice = await ap.invoices.create({
   reference: "order-123",
   amount: { amount: "25.00", currency: "USDT" },
+  chain: "TRON", // mint a deposit address up front
 });
-// → { token, checkoutUrl }
-console.log(checkout.checkoutUrl); // redirect the payer here
+console.log(invoice.address);
+
+await ap.checkouts.update(checkout.token, { paused: true }); // pause; { paused: false } resumes
+await ap.checkouts.del(checkout.token); // void
 ```
 
-Confirm the payment via the `payment.succeeded` webhook (see below) or by polling
-`ap.invoices.public.status(token)`.
+Confirm settlement via the `payment.succeeded` webhook (see below) or by polling `ap.checkouts.get(token)`.
 
-> **Removed in 0.4.0:** `ap.payments.createCheckout(...)` / `ap.payments.getCheckout(...)` (the singular
-> `POST /v1/checkout` "hosted pay-in order"). The endpoint no longer exists — migrate to
-> `ap.invoices.createCheckout(...)` above.
+### Deposits (own-balance top-ups)
+
+```ts
+const { items: chains } = await ap.deposits.chains();
+const address = await ap.deposits.createAddress({ chain: "ETH" }); // mint-or-return, idempotent
+const { items: history } = await ap.deposits.list({ chain: "ETH" }); // settled deposit history
+```
 
 ## Webhooks
 
