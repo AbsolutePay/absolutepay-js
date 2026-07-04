@@ -91,6 +91,13 @@ class PublicInvoices {
   status(token: string): Promise<InvoiceStatus> {
     return this.c.request("GET", `/v1/public/invoices/${encodeURIComponent(token)}/status`);
   }
+  /**
+   * Record a hosted-page open (best-effort analytics beacon; increments the link's open count).
+   * @param token - The invoice/checkout token (from {@link CheckoutLink.token}).
+   */
+  async trackOpen(token: string): Promise<void> {
+    await this.c.request("POST", `/v1/public/invoices/${encodeURIComponent(token)}/open`);
+  }
 }
 
 /** Create and manage invoices + hosted payment links (scopes: `invoices:write` to mutate, `invoices:read` to list). */
