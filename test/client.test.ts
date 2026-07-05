@@ -52,31 +52,48 @@ describe("AbsolutePay client", () => {
     expect(r.headers["x-absolutepay-nonce"]).toBeTruthy();
   });
 
-  it("builds query strings and serializes POST bodies", async () => {
-    const s = stub(200, { quote: "USDT", total: "0", lines: [] });
-    await client(s).balances.summary({ quote: "USDT" });
-    expect(s.last().url).toBe("https://api.test/v1/balances/summary?quote=USDT");
+  it("builds keyset list query strings and serializes POST bodies", async () => {
+    const s = stub(200, { items: [], nextCursor: null });
+    await client(s).checkouts.list({ status: "OPEN", limit: 25, before: "cur_1", order: "asc", q: "acme" });
+    expect(s.last().url).toBe("https://api.test/v1/checkouts?status=OPEN&limit=25&before=cur_1&order=asc&q=acme");
 
-    const s2 = stub(201, { token: "inv_1" });
-    await client(s2).invoices.create({ reference: "r1", amount: { amount: "1.00", currency: "USDT" }, chain: "MATIC" });
+    const s2 = stub(201, { token: "inv_1", address: "T...", chain: "TRON", currency: "USDT", amount: "1.00" });
+    await client(s2).invoices.create({ reference: "r1", amount: { amount: "1.00", currency: "USDT" }, chain: "TRON" });
     const r2 = s2.last();
     expect(r2.method).toBe("POST");
-    expect(JSON.parse(r2.body ?? "{}")).toMatchObject({ reference: "r1", chain: "MATIC" });
+    expect(JSON.parse(r2.body ?? "{}")).toMatchObject({ reference: "r1", chain: "TRON" });
     expect(r2.headers["content-type"]).toBe("application/json");
   });
 
-  it("sends redirectUrl in the invoice body when provided, omits it when not", async () => {
-    const withRedirect = stub(201, { token: "inv_2" });
-    await client(withRedirect).invoices.create({
-      reference: "r2",
-      amount: { amount: "1.00", currency: "USDT" },
-      redirectUrl: "https://shop.example.com/thanks",
-    });
-    expect(JSON.parse(withRedirect.last().body ?? "{}")).toMatchObject({ reference: "r2", redirectUrl: "https://shop.example.com/thanks" });
+  it("returns the raw { items, nextCursor } list envelope", async () => {
+    const s = stub(200, { items: [{ token: "inv_1" }], nextCursor: "cur_2" });
+    const page = await client(s).invoices.list();
+    expect(page.items).toHaveLength(1);
+    expect(page.nextCursor).toBe("cur_2");
+  });
 
-    const withoutRedirect = stub(201, { token: "inv_3" });
-    await client(withoutRedirect).invoices.create({ reference: "r3", amount: { amount: "1.00", currency: "USDT" } });
-    expect(JSON.parse(withoutRedirect.last().body ?? "{}")).not.toHaveProperty("redirectUrl");
+  it("creates a hosted checkout via checkouts.create (not invoices)", async () => {
+    const s = stub(201, { token: "chk_1", checkoutUrl: "https://pay/chk_1", status: "OPEN" });
+    const link = await client(s).checkouts.create({ reference: "r2", amount: { amount: "1.00", currency: "USDT" } });
+    const r = s.last();
+    expect(r.method).toBe("POST");
+    expect(r.url).toBe("https://api.test/v1/checkouts");
+    expect(link.checkoutUrl).toBe("https://pay/chk_1");
+  });
+
+  it("update -> PATCH and del -> DELETE on the token", async () => {
+    const upd = stub(200, { token: "chk_1", status: "OPEN" });
+    await client(upd).checkouts.update("chk_1", { paused: true, redirectUrl: null });
+    const u = upd.last();
+    expect(u.method).toBe("PATCH");
+    expect(u.url).toBe("https://api.test/v1/checkouts/chk_1");
+    expect(JSON.parse(u.body ?? "{}")).toEqual({ paused: true, redirectUrl: null });
+
+    const del = stub(200, { ok: true });
+    await client(del).invoices.del("inv_9");
+    const d = del.last();
+    expect(d.method).toBe("DELETE");
+    expect(d.url).toBe("https://api.test/v1/invoices/inv_9");
   });
 
   it("maps a non-2xx problem+json into AbsolutePayError", async () => {
@@ -110,6 +127,42 @@ describe("AbsolutePay client", () => {
     const s = stub(202, { merchantBatchNo: "po_1", status: "PROCESSING", subOrders: [] });
     await client(s).payouts.create({ items: [{ recipientAddress: "0xabc", chain: "MATIC", amount: { amount: "1.00", currency: "USDT" } }] });
     expect(s.last().headers["Idempotency-Key"]).toBeUndefined();
+  });
+
+  it("wires Idempotency-Key on refunds/conversions/offramp money POSTs", async () => {
+    const refund = stub(201, { merchantTradeNo: "o1", refundRequestId: "rf_1", status: "PENDING", amount: "1", currency: "USDT" });
+    await client(refund).refunds.create(
+      { merchantTradeNo: "o1", amount: { amount: "1.00", currency: "USDT" } },
+      { idempotencyKey: "rf-key" },
+    );
+    expect(refund.last().headers["Idempotency-Key"]).toBe("rf-key");
+
+    const conv = stub(201, { orderId: "cv_1", status: "SUCCESS" });
+    await client(conv).conversions.execute(
+      { quoteId: "q1", sell: { amount: "1", currency: "USDT" }, buy: { amount: "1", currency: "USDC" } },
+      { idempotencyKey: "cv-key" },
+    );
+    expect(conv.last().headers["Idempotency-Key"]).toBe("cv-key");
+  });
+
+  it("returns { items, total, nextCursor } from ledger history lists", async () => {
+    const s = stub(200, { items: [{ recordId: "r1" }], total: 42, nextCursor: null });
+    const page = await client(s).conversions.list({ from: 1, currency: "USDT" });
+    expect(s.last().url).toBe("https://api.test/v1/conversions?from=1&currency=USDT");
+    expect(page.total).toBe(42);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("exposes deposits addresses/getAddress/list", async () => {
+    const addr = stub(200, { chain: "ETH", address: "0x1", currencies: ["ETH"] });
+    await client(addr).deposits.getAddress("ETH");
+    expect(addr.last().url).toBe("https://api.test/v1/deposits/addresses/ETH");
+
+    const create = stub(200, { chain: "ETH", address: "0x1", currencies: ["ETH"] });
+    await client(create).deposits.createAddress({ chain: "ETH" });
+    const c = create.last();
+    expect(c.method).toBe("POST");
+    expect(c.url).toBe("https://api.test/v1/deposits/address");
   });
 
   it("does not sign when no signing secret is configured", async () => {

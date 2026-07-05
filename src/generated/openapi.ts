@@ -11,25 +11,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Account balances */
+        /**
+         * List balances
+         * @description Return every asset your workspace currently holds, one line per currency. Each line carries an `available` amount (spendable right now — for payouts, conversions, gift cards, or off-ramp) and a `locked` amount (reserved against in-flight operations and released when they settle). Balances are tracked per coin regardless of network: a deposit on any supported chain credits the same currency line. This read-only `GET` is also the easiest first call to confirm your API key and request signing are wired correctly. Needs the `balances:read` scope; returns `401` if the key lacks it.
+         */
         get: operations["getBalances"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/balances/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Combined balance in one quote currency */
-        get: operations["getBalanceSummary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -45,7 +31,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Settled collections by time range */
+        /**
+         * List settled collections
+         * @description The settled record of your pay-ins, read straight from the ledger — the source of truth for accounting and reconciliation. Filter by time range with `from`/`to` (epoch milliseconds) and page with `limit` plus the opaque `before` cursor (stop when the response `nextCursor` is `null`); use `order` to sort by settlement time — `desc` (newest first, default) or `asc`. Each `items` row is a settled collection you match against your own order by its `merchantTradeNo`, alongside the `status`, `amount`, `currency`, and `paidAt`; the response also carries a `total` count for the filtered range. Read-only; needs the `ledger:read` scope. Use this for offline bookkeeping; `GET /v1/deposits` covers coins received on your permanent deposit addresses.
+         */
         get: operations["listReconciliationPayments"];
         put?: never;
         post?: never;
@@ -62,7 +51,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Payout suborders by time range */
+        /**
+         * List settled payouts
+         * @description The settled record of your outbound payouts, one row per suborder. Filter by time range with `from`/`to` (epoch milliseconds) and page with `limit` plus the opaque `before` cursor (stop when the response `nextCursor` is `null`); use `order` to sort by settlement time — `desc` (newest first, default) or `asc`. Reconcile each `items` row against your batch by `merchantBatchNo`, its `suborderId`, and the on-chain `txId`, alongside the `chain`, `amount`, and `status`; a `total` count for the range is included. Read-only; needs the `ledger:read` scope.
+         */
         get: operations["listReconciliationWithdrawals"];
         put?: never;
         post?: never;
@@ -80,8 +72,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Preview the fee on an order before transacting
-         * @description The total fee on a given amount, before you transact.
+         * Preview a fee
+         * @description Compute the total fee on a hypothetical amount before you transact, so you can show costs or net proceeds up front. Required query params are `amount` and `currency`; optionally pass `paymentType` (one of `CHECKOUT`, `WITHDRAWAL`, `SUBSCRIPTION`, `CONVERSION`, `OFFRAMP`, `GIFTCARD`) to price a specific flow. The response returns the total `fee`, the `net` (amount minus fee), and the two portions that make it up — your account-tier fee and the `networkFee`. This is a read-only estimate; it neither creates nor reserves anything. Needs the `balances:read` scope; returns `400` on an invalid amount or currency.
          */
         get: operations["previewFee"];
         put?: never;
@@ -99,11 +91,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List refunds
+         * @description The settled record of your refunds, read straight from the funds ledger — every refund that has actually moved money back to a customer, one row per settlement. Filter by time range with `from`/`to` (epoch milliseconds), narrow to a single asset with `currency`, and page with `limit` plus the opaque `before` cursor (stop when the response `nextCursor` is `null`); use `order` to sort by settlement time — `desc` (newest first, default) or `asc`. A refund you just created with `POST /v1/refunds` is still `PENDING` and will NOT appear here until it settles — poll `GET /v1/refunds/{id}` or watch the `charge.refunded` webhook for in-flight status; this list is strictly the money that has already moved. Each `items` row is a ledger entry with a `recordId`, `ts` (epoch ms), `currency`, signed `change` (a refund is a debit, so negative), `type` (always `REFUND`), and the originating `ref`; the response also carries a `total` count for the filtered range. Read-only; needs the `ledger:read` scope.
+         */
+        get: operations["listRefunds"];
         put?: never;
         /**
-         * Refund a settled order (full or partial)
-         * @description Refund a (portion of a) settled checkout order. Confirmation arrives async via the PAY_REFUND callback, which reverses the accrued fees. Idempotent on refundRequestId.
+         * Refund a settled order
+         * @description Refund all or part of a settled checkout/invoice order. The body takes the original order's `merchantTradeNo`, the `amount` to refund as a `{amount, currency}` object, an optional `reason`, and an optional `refundRequestId` that doubles as the idempotency key — it is auto-generated if omitted, so send your own to make retries safe. Responds `201` with the refund's `refundRequestId`, `amount`, and a `status` that starts at `PENDING`. Settlement is asynchronous: the `charge.refunded` webhook confirms the outcome (`REFUND_SUCCESS` or `REFUND_REJECTED`) and reverses the fees originally accrued — treat that webhook as the source of truth and process it idempotently. Send an `Idempotency-Key` header to make retries safe — the same key + body replays the original response, a different body returns `409`. Needs the `payments:write` scope; returns `400` if the amount exceeds the refundable remainder.
          */
         post: operations["createRefund"];
         delete?: never;
@@ -119,7 +115,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Refund status */
+        /**
+         * Get a refund
+         * @description Fetch a single refund by its id (the `refundRequestId` returned on create) and track it from `PENDING` to a terminal `REFUND_SUCCESS` or `REFUND_REJECTED`. The response echoes the `merchantTradeNo`, `refundRequestId`, `amount`, `currency`, and current `status`. Prefer the `charge.refunded` webhook as your primary signal and process it idempotently; use this poll as a fallback when a webhook is missed. Read-only, but needs the `payments:write` scope (same guard as creating a refund); returns `404` for an unknown id.
+         */
         get: operations["getRefund"];
         put?: never;
         post?: never;
@@ -138,7 +137,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Batch payout (idempotent via Idempotency-Key) */
+        /**
+         * Create a payout
+         * @description Send a batch of one or more payouts from your `available` balance to external addresses. The body is `items`, an array of at least one `{recipientAddress, chain, amount, memo?}` entry; each recipient becomes a suborder you track independently. The request is accepted synchronously (`202`) returning a `merchantBatchNo` and per-suborder statuses, then settles asynchronously — watch the `payout.settled` / `payout.partial` / `payout.failed` webhooks, and note `deliveredAmount` on a `PARTIAL` result. Always send a unique `Idempotency-Key` header so a retried request never pays twice: the same key + body replays the original response, a different body returns `409`. Call `GET /v1/payouts/options` first to validate the chain and surface fees/limits. Needs the `payouts:write` scope; returns `400` on an unsupported chain or insufficient balance.
+         */
         post: operations["createPayout"];
         delete?: never;
         options?: never;
@@ -153,7 +155,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Supported chains + withdraw fee/limits for a currency */
+        /**
+         * List payout options
+         * @description List the chains available to pay out a given `currency` (required query param), each returned with its `withdrawFee`, `minWithdraw`/`maxWithdraw` limits, `minConfirm`, and a human-readable network `label`. Call this before `POST /v1/payouts` to validate the recipient's chain, surface accurate costs, and enforce min/max amounts in your UI. Read-only; needs the `payouts:read` scope.
+         */
         get: operations["listWithdrawOptions"];
         put?: never;
         post?: never;
@@ -170,8 +175,111 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Payout status */
+        /**
+         * Get a payout
+         * @description Fetch a payout batch by its `merchantBatchNo` (the path `id`), including every suborder with its `recipientAddress`, `chain`, `amount`, `status`, `txid`, `deliveredAmount`, and `fee`. Use it to reconcile a batch that settled partially (`PARTIAL`) or to poll when a `payout.*` webhook is missed. Read-only; needs the `payouts:read` scope; returns `404` for an unknown batch.
+         */
         get: operations["getPayout"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deposits/chains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List deposit networks
+         * @description List the networks available to receive funds into your own balance, each `items` entry carrying its `chain` code, a display `label`, and the `currencies` (coins) it accepts. A balance is one number per coin, so a deposit on any network credits the same coin balance — the network is just the rail the sender uses. Use this to build the network selector before calling `POST /v1/deposits/address`. Read-only; needs the `balances:read` scope.
+         */
+        get: operations["listDepositChains"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deposits/address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a deposit address
+         * @description Return your reusable deposit address for the chosen network, minting it on first use and returning the same address on every later call (idempotent). The body takes `chain` (a network code from `GET /v1/deposits/chains`). The response is the `address`, the `chain`, the `currencies` it accepts, and a `memo` — on memo networks the memo is required, and sending without it can lose funds. The address is permanent and never expires, so store it and reuse it for every deposit; incoming funds credit your balance for whichever coin was sent. Needs the `balances:read` scope; returns `400` for an unsupported chain.
+         */
+        post: operations["createDepositAddress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deposits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List deposits
+         * @description List settled deposits received on your permanent deposit addresses (the ones from `POST /v1/deposits/address`) over a time window. Optional `chain` narrows to one network code; `from`/`to` are unix-millisecond bounds and default to the last 30 days. Each `items` entry carries its `transactionId`, `chain`, `currency`, `amount`, settlement `status` (e.g. `PAID`), the on-chain `txHash`, and `createdAt` (unix ms). Page with the opaque `before` cursor (start with none; pass back the response `nextCursor` until it is `null`) and use `order` to sort by receipt time — `desc` (newest first, default) or `asc`. Read-only; needs the `balances:read` scope.
+         */
+        get: operations["listDeposits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deposits/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List deposit addresses
+         * @description List the reusable deposit addresses you've created (via `POST /v1/deposits/address`), one per network. Use this to render your stored receive addresses without re-minting each one. Optional `chain` narrows to a single network code (from `GET /v1/deposits/chains`). Each item carries its `chain`, the permanent `address`, the `currencies` (coins) that network accepts, an optional `memo` (destination tag, required to receive on memo networks), and `createdAt` (unix ms, when you first created it). Results are keyset-ordered by creation time; page with `limit` and the opaque `before` cursor, stopping when the response `nextCursor` is `null`. Use `order` to sort — `desc` (newest first, default) or `asc` (oldest first). Read-only; needs the `balances:read` scope.
+         */
+        get: operations["listDepositAddresses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deposits/addresses/{chain}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a deposit address
+         * @description Fetch one reusable deposit address by its network code (`chain`, from `GET /v1/deposits/chains`). Returns the permanent `address`, the `chain`, the `currencies` (coins) that network accepts, an optional `memo` (destination tag, required to receive on memo networks), and `createdAt` (unix ms). This reads your stored address without re-minting, so it's the cheap way to resolve a single network's address for a receive screen. Returns `404` when you haven't created an address for that network yet — call `POST /v1/deposits/address` first. Read-only; needs the `balances:read` scope.
+         */
+        get: operations["getDepositAddress"];
         put?: never;
         post?: never;
         delete?: never;
@@ -189,7 +297,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Convert quote */
+        /**
+         * Preview a conversion
+         * @description Quote a conversion between two assets in your balance without executing it. Provide `sellCurrency`, `buyCurrency`, and exactly one of `sellAmount` / `buyAmount` (the other side is computed). The response returns a `quoteId`, the `rate`, and both resulting amounts (`sellAmount`/`buyAmount`). Quotes are short-lived — pass the `quoteId` to `POST /v1/conversions` promptly, and re-quote if it expires. Needs the `convert:write` scope; returns `400` if both or neither amount is supplied.
+         */
         post: operations["previewConversion"];
         delete?: never;
         options?: never;
@@ -204,9 +315,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Conversions history
+         * @description The settled record of your conversions, read straight from the funds ledger — every asset swap that has actually settled, so you can reconcile realized conversions against your own books. Filter by time range with `from`/`to` (epoch milliseconds), narrow to a single asset with `currency`, and page with `limit` plus the opaque `before` cursor (stop when the response `nextCursor` is `null`); use `order` to sort by settlement time — `desc` (newest first, default) or `asc`. A conversion is recorded only once it settles: a swap still in `PENDING` from `POST /v1/conversions` will NOT appear here yet. Each `items` row is a ledger entry with a `recordId`, `ts` (epoch ms), `currency`, signed `change` (the sell leg debits, the buy leg credits), `type` (always `CONVERT`), and the originating order `ref`; the response also carries a `total` count for the filtered range. Read-only; needs the `ledger:read` scope.
+         */
+        get: operations["listConversions"];
         put?: never;
-        /** Execute convert */
+        /**
+         * Execute a conversion
+         * @description Execute a conversion previously quoted by `POST /v1/conversions/quote`, moving balance from the sell asset into the buy asset. The body takes the `quoteId` plus the `sell` and `buy` Money objects echoed from the quote. Responds `201` with an `orderId`, a `status` (`SUCCESS`, `PENDING`, or `FAILED`), and the final `sell`/`buy` amounts. Re-quote first if the quote has expired. Send an `Idempotency-Key` header to make retries safe — the same key + body replays the original response, a different body returns `409`. Needs the `convert:write` scope; returns `400` for an expired or unknown quote.
+         */
         post: operations["executeConversion"];
         delete?: never;
         options?: never;
@@ -221,10 +339,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the workspace's plans */
+        /**
+         * List plans
+         * @description List every subscription plan you have defined, each with its `merchantPlanNo`, `planNo`, `name`, `amount`, `interval`/`intervalCount`, and `totalCycles`. Use it to populate a plan picker or to look up the `planNo` you need when creating a subscription. Read-only; needs the `subscriptions:read` scope.
+         */
         get: operations["listSubscriptionPlans"];
         put?: never;
-        /** Define a reusable subscription plan */
+        /**
+         * Create a plan
+         * @description Define a reusable recurring billing plan that customers can subscribe to. The body requires `merchantPlanNo` (your reference and idempotency key), `name`, `amount`, `interval` (`DAY`, `WEEK`, `MONTH`, or `YEAR`), `intervalCount`, and `totalCycles`. Responds `201` with the created plan including its `planNo` — pass that as `planNo` when subscribing a customer. One plan can back many subscriptions, so create it once and reuse it. Send an `Idempotency-Key` header to make retries safe — the same key + body replays the original response, a different body returns `409`. Needs the `subscriptions:write` scope; returns `400` on invalid interval or amount.
+         */
         post: operations["createSubscriptionPlan"];
         delete?: never;
         options?: never;
@@ -239,10 +363,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the workspace's customer subscriptions (keyset-paginated) */
+        /**
+         * List subscriptions
+         * @description List your customer subscriptions and their current state. Narrow with the `status` filter (`PENDING`, `ACTIVE`, `PAST_DUE`, `COMPLETED`, `CANCELLED`, or `BLOCKED`) and search references with `q`. Page with `limit` and the opaque `before` cursor; the response `nextCursor` is `null` on the last page. Use `order` to sort by creation time — `desc` (newest first, default) or `asc` (oldest first). Read-only; needs the `subscriptions:read` scope.
+         */
         get: operations["listSubscriptions"];
         put?: never;
-        /** Subscribe one of your customers to a plan (returns the authorization link) */
+        /**
+         * Create a subscription
+         * @description Subscribe one of your customers to an existing plan. The body takes `merchantSubNo` (your reference and idempotency key), the `planNo` of the plan to bill, and an optional `callbackUrl`. Responds `201` with the subscription's `subId`, a `status` that starts at `PENDING`, and a `subscribeUrl` — send the customer there to authorize recurring charges. Once authorized the subscription becomes `ACTIVE` and bills each cycle, firing a `payment.succeeded` webhook per successful deduction. Send an `Idempotency-Key` header to make retries safe — the same key + body replays the original response, a different body returns `409`. Needs the `subscriptions:write` scope; returns `400` for an unknown plan.
+         */
         post: operations["createSubscription"];
         delete?: never;
         options?: never;
@@ -257,7 +387,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Billing-cycle history for a subscription */
+        /**
+         * List charges
+         * @description List the charge history for one subscription (identified by `merchantSubNo` in the path), one entry per billing cycle. Each entry carries the `paymentOrderNo`, `amount`, a `status` (`SUCCESS`, `FAILED`, `BLOCKED`, or `PENDING`), and the timestamp `ts`. Use it to reconcile recurring revenue or to spot failed cycles. Read-only; needs the `subscriptions:read` scope.
+         */
         get: operations["listDeductions"];
         put?: never;
         post?: never;
@@ -276,7 +409,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel a subscription */
+        /**
+         * Cancel a subscription
+         * @description Cancel a subscription (identified by `merchantSubNo` in the path) so no further cycles are billed. Already-settled charges are unaffected, and the response returns the subscription with its `status` moved to `CANCELLED`. Cancellation is terminal — a cancelled subscription cannot be resumed; create a new one instead. Needs the `subscriptions:write` scope; returns `404` for an unknown `merchantSubNo`.
+         */
         post: operations["cancelSubscription"];
         delete?: never;
         options?: never;
@@ -291,14 +427,49 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List checkouts
+         * @description List your hosted checkout links (the `checkout` kind only — invoices are listed separately via `GET /v1/invoices`). Filter by `status` (`OPEN`, `PAID`, `EXPIRED`, or `VOID`) and search references with `q`. Results are keyset-ordered newest-first by default; page with `limit` and the opaque `before` cursor, and stop when the response `nextCursor` is `null`. Use `order` to sort by creation time — `desc` (newest first, default) or `asc` (oldest first). Each item includes the `token`, `reference`, `amount`, `status`, `opens`, and timestamps. Read-only; needs the `invoices:read` scope.
+         */
+        get: operations["listCheckouts"];
         put?: never;
-        /** Create a checkout — returns the hosted /pay page URL (payer picks the asset) */
+        /**
+         * Create a checkout
+         * @description Create a shareable hosted checkout link where the payer picks which asset and chain to pay with on the hosted page — the counterpart to `POST /v1/invoices`, which instead fixes a `chain` and mints the deposit address up front. The body requires `reference` and `amount`, and optionally takes `description`, `customerEmail`, `expiresAt` (epoch ms), and `redirectUrl` (the payer returns there on a terminal state with `?token=&status=`). Responds `201` with a `token` plus a `checkoutUrl` (or relative `payPath`) to send the customer to, and an initial `status` of `OPEN`. It settles like any pay-in — fulfill on the `payment.succeeded` webhook. Checkouts and invoices share one table split by `kind`, so this `token` is a checkout: passing it to the invoice endpoints returns `404`. Needs the `invoices:write` scope; returns `400` on a bad amount.
+         */
         post: operations["createCheckoutLink"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/checkouts/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a checkout
+         * @description Fetch a single hosted checkout link by its `token`, returning the full record: `reference`, `amount`, `status`, `paused`, `opens`, `txId`/`paidChain` once paid, any `activeDeposit` to resume, and timestamps. This endpoint is kind-scoped — it resolves only `checkout` tokens and returns `404` if the token is an invoice (use `GET /v1/invoices/{token}` for those) or unknown. Read-only; needs the `invoices:read` scope.
+         */
+        get: operations["getCheckout"];
+        put?: never;
+        post?: never;
+        /**
+         * Void a checkout
+         * @description Void a checkout link so it can no longer be paid, returning `{ ok: true }`. Voiding is terminal — the link moves to `VOID` and cannot be reopened; issue a new checkout instead. Kind-scoped, so a non-checkout or unknown `token` returns `404`. Needs the `invoices:write` scope.
+         */
+        delete: operations["deleteCheckout"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a checkout
+         * @description Update a checkout link's mutable fields only: `paused` (pause/unpause — a paused link won't accept payment), `redirectUrl`, `expiresAt`, and `description`. Omit a field to leave it unchanged; send `null` on `redirectUrl`/`expiresAt`/`description` to clear it. The `amount`, `currency`, `kind`, and `status` are immutable and cannot be patched. Returns the updated checkout; kind-scoped, so a non-checkout or unknown `token` returns `404`. Needs the `invoices:write` scope; returns `400` on an invalid field.
+         */
+        patch: operations["updateCheckout"];
         trace?: never;
     };
     "/v1/invoices": {
@@ -308,10 +479,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the workspace's invoices (keyset-paginated) */
+        /**
+         * List invoices
+         * @description List your invoices (the `invoice` kind only — hosted links are listed separately via `GET /v1/checkouts`). Filter by `status` (`OPEN`, `PAID`, `EXPIRED`, or `VOID`) and search references with `q`; `status=PAID` is your settled pay-ins feed. Results are keyset-ordered newest-first by default; page with `limit` and the opaque `before` cursor, stopping when the response `nextCursor` is `null`. Use `order` to sort by creation time — `desc` (newest first, default) or `asc` (oldest first). Read-only; needs the `invoices:read` scope.
+         */
         get: operations["listInvoices"];
         put?: never;
-        /** Create an invoice / payment link (pass `chain` to mint a deposit address up front) */
+        /**
+         * Create an invoice
+         * @description Create an invoice billed on a specific network: unlike a checkout, `chain` is required and the on-chain deposit `address` is minted up front so the payer sends funds directly to it — no hosted asset picker. The body requires `reference`, `amount`, and `chain`, and optionally takes `description`, `customerEmail`, `expiresAt` (epoch ms), and `redirectUrl`. Responds `201` with the invoice `token`, the minted `address` (plus `memo` on memo chains), `chain`, `currency`, `amount`, and expiry timestamps. For a payer-picks hosted link instead, use `POST /v1/checkouts`. Invoices and checkouts share one table split by `kind`, so this `token` is an invoice and returns `404` from the checkout endpoints. Needs the `invoices:write` scope; returns `400` on a bad amount or unsupported chain.
+         */
         post: operations["createInvoice"];
         delete?: never;
         options?: never;
@@ -319,157 +496,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/invoices/stats": {
+    "/v1/invoices/{token}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Aggregate Checkout stats (active links, opens, conversion, volume) */
-        get: operations["getCheckoutStats"];
+        /**
+         * Get an invoice
+         * @description Fetch a single invoice by its `token`, returning the full record: `reference`, `amount`, `status`, `paused`, `txId`/`paidChain` once paid, any `activeDeposit` to resume (same address plus countdown), and timestamps. This endpoint is kind-scoped — it resolves only `invoice` tokens and returns `404` if the token is a checkout (use `GET /v1/checkouts/{token}` for those) or unknown. Read-only; needs the `invoices:read` scope.
+         */
+        get: operations["getInvoice"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Void an invoice
+         * @description Void an invoice so it can no longer be paid, returning `{ ok: true }`. Voiding is terminal — the invoice moves to `VOID` and cannot be reopened; create a new invoice instead. Kind-scoped, so a non-invoice or unknown `token` returns `404`. Needs the `invoices:write` scope.
+         */
+        delete: operations["deleteInvoice"];
         options?: never;
         head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/invoices/{token}/pause": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Live/Paused toggle for a checkout link */
-        post: operations["pauseInvoice"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/invoices/{token}/void": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Void an open invoice */
-        post: operations["voidInvoice"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/public/invoices/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Public invoice view for the hosted checkout (unauthenticated, by token) */
-        get: operations["getPublicInvoice"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/public/invoices/{token}/open": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Count a checkout-link view (unauthenticated, best-effort) */
-        post: operations["trackInvoiceOpen"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/public/invoices/{token}/assets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Full pay-in asset catalog — every token × network (unauthenticated) */
-        get: operations["listInvoiceAssets"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/public/invoices/{token}/quote": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Live pay-in quote for the chosen token (unauthenticated) */
-        post: operations["quoteInvoicePayIn"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/public/invoices/{token}/deposit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Mint a deposit address for the chosen asset (unauthenticated) */
-        post: operations["createInvoiceDeposit"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/public/invoices/{token}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Poll the invoice's pay status (unauthenticated) */
-        get: operations["getInvoiceStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
+        /**
+         * Update an invoice
+         * @description Update an invoice's mutable fields only: `paused` (pause/unpause — a paused invoice won't accept payment), `redirectUrl`, `expiresAt`, and `description`. Omit a field to leave it unchanged; send `null` on `redirectUrl`/`expiresAt`/`description` to clear it. The `amount`, `currency`, `chain`, `kind`, and `status` are immutable and cannot be patched. Returns the updated invoice; kind-scoped, so a non-invoice or unknown `token` returns `404`. Needs the `invoices:write` scope; returns `400` on an invalid field.
+         */
+        patch: operations["updateInvoice"];
         trace?: never;
     };
     "/v1/offramp/countries": {
@@ -479,7 +531,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Supported bank countries (OTC off-ramp) */
+        /**
+         * Off-ramp countries
+         * @description List the countries supported for off-ramp — converting crypto into fiat paid out to a bank account. Each entry has a numeric `id` and a `name`; pass the `id` as `countryId` when registering a bank. Call this first to populate the country selector in your bank-registration flow. Read-only; needs the `payouts:read` scope.
+         */
         get: operations["listOffRampCountries"];
         put?: never;
         post?: never;
@@ -496,11 +551,57 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your registered banks + approval status */
+        /**
+         * List bank accounts
+         * @description List your registered bank accounts available as off-ramp destinations. Each returns its `bankAccountId`, `bankAccountName`, `bankName`, `countryName`, `iban`, and a `status` (`approved`, `pending`, `materials`, or `rejected`) — a `memo` carries the reason when rejected, and only `approved` accounts can receive a withdrawal. Read-only; needs the `payouts:read` scope.
+         */
         get: operations["listOffRampBanks"];
         put?: never;
-        /** Register a bank (statement base64; reviewed asynchronously) */
+        /**
+         * Register a bank
+         * @description Register a bank account as an off-ramp destination. The body requires `bankAccountName` (must match your verified identity), `bankName`, `countryId` (from `GET /v1/offramp/countries`), `iban`, and a `file` (a base64 bank statement for verification); `swift`, `address`, and `remittanceLineNumber` are optional. Responds `201` with the bank and its initial `status`. The account is reviewed before it can receive funds, and may ask for more documents (`status: materials`) via `POST /v1/offramp/banks/{bankAccountId}/materials`. Needs the `payouts:write` scope; returns `400` on invalid bank details.
+         */
         post: operations["registerOffRampBank"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/offramp/banks/{bankAccountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a bank
+         * @description Remove a registered off-ramp bank account by its `bankAccountId` (path param) so it is no longer available as a withdrawal destination. Responds `204` with no body. Needs the `payouts:write` scope; returns `400` for an unknown bank account.
+         */
+        delete: operations["deleteOffRampBank"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/offramp/banks/{bankAccountId}/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit bank documents
+         * @description Upload supplementary verification documents for a bank account that is under review (`status: materials`), identified by `bankAccountId` in the path. The body takes `certificate` (company registration / business license) and `passport` (government-issued ID), each an array of 1–5 base64 files up to 4MB (jpg/png/pdf). Responds `202` with `{ ok: true }`; the account becomes usable once review passes. Needs the `payouts:write` scope; returns `400` on missing or oversized files.
+         */
+        post: operations["submitOffRampBankMaterials"];
         delete?: never;
         options?: never;
         head?: never;
@@ -516,7 +617,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** SELL quote (crypto → fiat); min 1000 USDT-equivalent */
+        /**
+         * Preview an off-ramp
+         * @description Quote a crypto-to-fiat off-ramp before committing. The body requires `cryptoCurrency`, `fiatCurrency`, and `cryptoAmount` (subject to a per-transaction minimum of 1000 USDT-equivalent). The response returns a `quoteToken` plus the resulting `fiatAmount`, `fiatRate`, and a `validPeriod`. Quotes are short-lived — pass the `quoteToken` to `POST /v1/offramp/withdraw` promptly, and re-quote if it expires. Needs the `payouts:write` scope; returns `400` below the minimum or for an unsupported pair.
+         */
         post: operations["offRampQuote"];
         delete?: never;
         options?: never;
@@ -533,7 +637,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create an off-ramp withdraw order against a quote + approved bank */
+        /**
+         * Withdraw to a bank
+         * @description Execute an off-ramp withdrawal, cashing out crypto to fiat in an approved bank account. The body takes the `quoteToken` from `POST /v1/offramp/quote`, the destination `bankAccountId` (must be `approved`), and the `cryptoCurrency`/`fiatCurrency`/`cryptoAmount`/`fiatAmount` echoed from the quote. Responds `201` with an `orderId`, `clientOrderId`, and a `status` (`PENDING` → `DISPATCHED` → `SUCCESS`/`FAILED`); it settles asynchronously and reports via the payout webhooks. Send an `Idempotency-Key` header to make retries safe — the same key + body replays the original response, a different body returns `409`. Needs the `payouts:write` scope; returns `400` for an expired quote or a bank that is not yet approved.
+         */
         post: operations["offRampWithdraw"];
         delete?: never;
         options?: never;
@@ -548,7 +655,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your off-ramp orders (keyset-paginated) */
+        /**
+         * List off-ramp orders
+         * @description List your off-ramp withdrawal orders, for reconciliation. Filter by `status` (`PENDING`, `DISPATCHED`, `SUCCESS`, or `FAILED`) and search with `q`; page with `limit` and the opaque `before` cursor until the response `nextCursor` is `null`. Use `order` to sort by creation time — `desc` (newest first, default) or `asc` (oldest first). Each order carries its `orderId`, `clientOrderId`, crypto/fiat currencies and amounts, `status`, and `createdAt`. Read-only; needs the `payouts:read` scope.
+         */
         get: operations["listOffRampOrders"];
         put?: never;
         post?: never;
@@ -565,7 +675,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Gift-card cover templates */
+        /**
+         * List gift-card templates
+         * @description List the available gift-card cover designs you can issue cards from. Each template returns an `id` (pass it as `templateId` when issuing a card), a `titleEn`, an `imageUrl`, and a `coverType`. Call this to build a design picker before `POST /v1/giftcards`. Read-only; needs the `balances:read` scope.
+         */
         get: operations["listGiftTemplates"];
         put?: never;
         post?: never;
@@ -582,10 +695,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your issued gift cards (keyset-paginated) */
+        /**
+         * List gift cards
+         * @description List the gift cards you have issued. Filter by `status` (`PENDING`, `ACTIVE`, `REDEEMED`, `FROZEN`, `FAILED`, or `REVIEW`) and search with `q`; page with `limit` and the opaque `before` cursor until the response `nextCursor` is `null`. Use `order` to sort by creation time — `desc` (newest first, default) or `asc` (oldest first). The secret `cardKey` is omitted from list items unless your key is allowed to see it. Read-only; needs the `balances:read` scope.
+         */
         get: operations["listGiftCards"];
         put?: never;
-        /** Issue a prepaid gift card (funded from the workspace balance) */
+        /**
+         * Issue a gift card
+         * @description Issue a prepaid gift card funded from your balance. The body requires a `title`, a `templateId` (from `GET /v1/giftcards/templates`), and an `amount`. Responds `201` with the created card: its `cardNum`, the redemption `cardKey` (a secret — store it securely and hand it only to the recipient), `amount`, and a `status` that starts at `PENDING` and moves to `ACTIVE` once funded. Send an `Idempotency-Key` header to make retries safe — the same key + body replays the original response, a different body returns `409`. Needs the `payments:write` scope; returns `400` on a bad template or amount.
+         */
         post: operations["createGiftCard"];
         delete?: never;
         options?: never;
@@ -600,25 +719,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Poll a gift card's status */
+        /**
+         * Get a gift card
+         * @description Fetch a single issued gift card by its `cardNum` (path param), returning its `title`, `templateId`, `amount`, and current `status` — poll it to watch a card move from `PENDING` to `ACTIVE`. The secret `cardKey` is included only when your key is allowed to see it; otherwise it is omitted. Read-only; needs the `balances:read` scope.
+         */
         get: operations["getGiftCard"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/transactions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Unified ledger / reconciliation */
-        get: operations["listTransactions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -640,9 +745,12 @@ export interface components {
             /** @example USDT */
             currency: string;
         };
-        Problem: {
+        Error: {
+            /** @description stable, machine-readable error code */
             code: string;
-            title: string;
+            /** @description short human-readable summary */
+            title?: string;
+            /** @description context for this specific occurrence */
             detail?: string;
         };
         Balance: {
@@ -653,42 +761,82 @@ export interface components {
             /** @example 0 */
             locked: string;
         };
-        BalanceLine: {
-            /** @example ETH */
-            currency: string;
-            /** @example 1.250000 */
-            available: string;
-            /**
-             * @description available converted to the quote currency
-             * @example 4012.50
-             */
-            value: string;
-            /**
-             * @description quote units per 1 currency
-             * @example 3210.00
-             */
-            rate: string;
-            /** @description false when no convert quote was available */
-            priced: boolean;
-        };
-        BalanceSummary: {
-            /** @example USDT */
-            quote: string;
-            /**
-             * @description sum of priced line values, in the quote currency
-             * @example 5012.50
-             */
-            total: string;
-            lines: components["schemas"]["BalanceLine"][];
-        };
         WithdrawOption: {
             currency: string;
             /** @example MATIC */
             chain: string;
+            /** @description human network name, e.g. Ethereum(ERC20) */
+            label?: string;
             withdrawFee?: string;
             minWithdraw?: string;
             maxWithdraw?: string;
             minConfirm?: number;
+        };
+        DepositChain: {
+            /** @example ETH */
+            chain: string;
+            /** @example Ethereum(ERC20) */
+            label: string;
+            /**
+             * @description coins this network can receive
+             * @example [
+             *       "ETH",
+             *       "USDT",
+             *       "USDC"
+             *     ]
+             */
+            currencies: string[];
+        };
+        DepositAddressRequest: {
+            /**
+             * @description network code from GET /v1/deposits/chains
+             * @example ETH
+             */
+            chain: string;
+        };
+        DepositAddress: {
+            /** @example ETH */
+            chain: string;
+            /** @description permanent, reusable receive address for this network */
+            address: string;
+            /** @description destination tag/memo — required on memo networks; sending without it can lose funds */
+            memo?: string;
+            /**
+             * @description coins this address accepts on its network
+             * @example [
+             *       "ETH",
+             *       "USDT",
+             *       "USDC"
+             *     ]
+             */
+            currencies: string[];
+            /**
+             * Format: int64
+             * @description when this address was first created, unix ms (present on list/detail reads)
+             */
+            createdAt?: number;
+        };
+        Deposit: {
+            /** @description provider transaction id (stable dedupe key) */
+            transactionId: string;
+            /** @example TRX */
+            chain: string;
+            /** @example USDT */
+            currency: string;
+            /** @description amount credited, in the coin's units */
+            amount: string;
+            /**
+             * @description settlement status
+             * @example PAID
+             */
+            status: string;
+            /** @description on-chain transaction hash, when available */
+            txHash?: string;
+            /**
+             * Format: int64
+             * @description settlement time, unix ms
+             */
+            createdAt?: number;
         };
         PayOrderRecord: {
             merchantTradeNo: string;
@@ -750,7 +898,7 @@ export interface components {
             merchantTradeNo: string;
             refundRequestId: string;
             /**
-             * @description PENDING until the PAY_REFUND callback (REFUND_SUCCESS/REFUND_REJECTED)
+             * @description PENDING until the charge.refunded webhook (REFUND_SUCCESS/REFUND_REJECTED)
              * @example PENDING
              */
             status: string;
@@ -863,7 +1011,10 @@ export interface components {
         };
         SubscriptionPage: {
             items: components["schemas"]["Subscription"][];
-            /** @description echo as ?before for the next page; null on the last page */
+            /**
+             * @description Response-only opaque keyset cursor — you don't set it. To fetch the next page, pass this value back as the `before` query param. `null` means this was the last page.
+             * @example eyJpZCI6IjAxSlgwUTdBQiIsInRzIjoxNzE5NzkyMDAwMDAwfQ
+             */
             nextCursor: string | null;
         };
         DeductionOrder: {
@@ -875,6 +1026,7 @@ export interface components {
             /** Format: int64 */
             ts: number;
         };
+        /** @description Create an invoice — the deposit address is minted up front for `chain` (response is InvoiceWithAddress). For a payer-picks hosted link, use POST /v1/checkouts instead. */
         InvoiceRequest: {
             /** @description order/reference shown to the payer */
             reference: string;
@@ -886,21 +1038,39 @@ export interface components {
              * @description optional link expiry (epoch ms) — past it the link reads EXPIRED and won't accept payment
              */
             expiresAt?: number;
-            /** @description optional — when set, the deposit address is minted up front for this network (invoice flow) and the response is InvoiceWithAddress instead of Invoice */
-            chain?: string;
             /**
              * Format: uri
-             * @description optional http(s) return URL — once the hosted checkout reaches a terminal state the payer's browser is sent here with ?token=<token>&status=<SUCCESS|EXPIRED|CANCELED> appended (existing query preserved)
+             * @description http(s) URL — the payer is redirected here once the checkout reaches a terminal state, appending ?token=<token>&status=<SUCCESS|EXPIRED|CANCELED>
+             */
+            redirectUrl?: string;
+            /** @description REQUIRED — the network the deposit address is minted on, up front */
+            chain: string;
+        };
+        /** @description Create a hosted checkout link (payer picks the asset/chain on the /pay page). */
+        CheckoutLinkRequest: {
+            /** @description order/reference shown to the payer */
+            reference: string;
+            amount: components["schemas"]["Money"];
+            description?: string;
+            customerEmail?: string;
+            /**
+             * Format: int64
+             * @description optional link expiry (epoch ms) — past it the link reads EXPIRED and won't accept payment
+             */
+            expiresAt?: number;
+            /**
+             * Format: uri
+             * @description http(s) URL — the payer is redirected here once the checkout reaches a terminal state, appending ?token=<token>&status=<SUCCESS|EXPIRED|CANCELED>
              */
             redirectUrl?: string;
             /**
-             * @description which manager owns it; defaults to invoice
-             * @default invoice
+             * @description which manager owns it; defaults to checkout
+             * @default checkout
              * @enum {string}
              */
             kind: "invoice" | "checkout";
         };
-        /** @description Returned by POST /v1/invoices when `chain` is set — the deposit address minted up front. */
+        /** @description Returned by POST /v1/invoices — the deposit address minted up front for the given chain. */
         InvoiceWithAddress: {
             /** @description public /pay/<token> link id */
             token: string;
@@ -950,11 +1120,6 @@ export interface components {
             description?: string;
             /** @description set if you passed one on create */
             customerEmail?: string;
-            /**
-             * Format: uri
-             * @description echoed if set on create — where the payer's browser is returned after the hosted checkout reaches a terminal state
-             */
-            redirectUrl?: string;
             /** @enum {string} */
             status: "OPEN" | "PAID" | "EXPIRED" | "VOID";
             txId?: string;
@@ -970,66 +1135,40 @@ export interface components {
              * @description optional link expiry (epoch ms)
              */
             expiresAt?: number;
+            /**
+             * Format: uri
+             * @description merchant return URL, if set on create
+             */
+            redirectUrl?: string;
             /** Format: int64 */
             createdAt?: number;
             /** Format: int64 */
             paidAt?: number;
         };
-        /** @description The unauthenticated hosted-checkout view — deliberately omits owner-only fields (customerEmail, opens, timestamps). */
-        InvoicePublic: {
-            token: string;
-            merchantName: string;
-            reference: string;
-            amount: components["schemas"]["Money"];
-            description?: string;
+        /** @description PATCH body for a checkout/invoice — every field optional. Omit a field to leave it unchanged; send `null` to clear it (redirectUrl/expiresAt/description). */
+        InvoiceUpdate: {
+            /** @description Live/Paused — a paused link won't accept payment */
+            paused?: boolean;
             /**
              * Format: uri
-             * @description echoed if set on create — where the payer's browser is returned after the hosted checkout reaches a terminal state
+             * @description http(s) merchant return URL, or null to clear
              */
-            redirectUrl?: string;
-            /** @enum {string} */
-            status: "OPEN" | "PAID" | "EXPIRED" | "VOID";
-            paused: boolean;
-            txId?: string;
+            redirectUrl?: string | null;
             /**
              * Format: int64
-             * @description optional link expiry (epoch ms)
+             * @description link expiry (epoch ms), or null to clear
              */
-            expiresAt?: number;
-            /** @description un-expired deposit to resume on reload */
-            activeDeposit?: components["schemas"]["DepositOrder"];
+            expiresAt?: number | null;
+            /** @description free-text description, or null to clear */
+            description?: string | null;
         };
         InvoicePage: {
             items: components["schemas"]["Invoice"][];
-            /** @description echo as ?before for the next page; null on the last page */
+            /**
+             * @description Response-only opaque keyset cursor — you don't set it. To fetch the next page, pass this value back as the `before` query param. `null` means this was the last page.
+             * @example eyJpZCI6IjAxSlgwUTdBQiIsInRzIjoxNzE5NzkyMDAwMDAwfQ
+             */
             nextCursor: string | null;
-        };
-        CheckoutStats: {
-            activeLinks: number;
-            opens: number;
-            conversions: number;
-            /** @description paid / opened, 0..1 */
-            conversionRate: number;
-            volume: {
-                currency: string;
-                amount: string;
-            }[];
-        };
-        AssetChain: {
-            /** @description token the payer sends; the picker spans the full catalog */
-            currency: string;
-            chain: string;
-            fullCurrType: string;
-            label: string;
-        };
-        PayQuote: {
-            payCurrency: string;
-            /** @description amount of payCurrency to send so it equals the invoice total */
-            payAmount: string;
-            /** @description 1 when paying the invoice currency; else the conversion rate */
-            rate: string;
-            quoteId: string;
-            invoiceAmount: components["schemas"]["Money"];
         };
         DepositOrder: {
             prepayId: string;
@@ -1057,6 +1196,20 @@ export interface components {
             iban?: string;
             /** @enum {string} */
             status: "approved" | "pending" | "materials" | "rejected";
+            /** @description review note — the rejection reason when status is rejected */
+            memo?: string;
+        };
+        /** @description supplementary documents when a bank's status is 'materials'. Each file base64; ≤4MB; jpg/png/pdf. */
+        BankMaterialsRequest: {
+            /** @description company registration / business license */
+            certificate: components["schemas"]["DocFile"][];
+            /** @description government-issued ID */
+            passport: components["schemas"]["DocFile"][];
+        };
+        DocFile: {
+            filename: string;
+            contentType: string;
+            dataBase64: string;
         };
         BankRequest: {
             /** @description must match the merchant's verified identity */
@@ -1112,7 +1265,10 @@ export interface components {
         };
         OffRampOrderPage: {
             items: components["schemas"]["OffRampOrder"][];
-            /** @description echo as ?before for the next page; null on the last page */
+            /**
+             * @description Response-only opaque keyset cursor — you don't set it. To fetch the next page, pass this value back as the `before` query param. `null` means this was the last page.
+             * @example eyJpZCI6IjAxSlgwUTdBQiIsInRzIjoxNzE5NzkyMDAwMDAwfQ
+             */
             nextCursor: string | null;
         };
         GiftTemplate: {
@@ -1140,7 +1296,10 @@ export interface components {
         };
         GiftCardPage: {
             items: components["schemas"]["GiftCard"][];
-            /** @description echo as ?before for the next page; null on the last page */
+            /**
+             * @description Response-only opaque keyset cursor — you don't set it. To fetch the next page, pass this value back as the `before` query param. `null` means this was the last page.
+             * @example eyJpZCI6IjAxSlgwUTdBQiIsInRzIjoxNzE5NzkyMDAwMDAwfQ
+             */
             nextCursor: string | null;
         };
         LedgerEntry: {
@@ -1153,10 +1312,6 @@ export interface components {
             type: string;
             ref?: string;
         };
-        LedgerPage: {
-            entries: components["schemas"]["LedgerEntry"][];
-            total?: number;
-        };
     };
     responses: {
         /** @description Invalid request */
@@ -1165,7 +1320,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Problem"];
+                "application/json": components["schemas"]["Error"];
             };
         };
         /** @description Missing or invalid API key / scope */
@@ -1174,7 +1329,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Problem"];
+                "application/json": components["schemas"]["Error"];
             };
         };
         /** @description Resource not found */
@@ -1183,15 +1338,30 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Problem"];
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description idempotency/uniqueness conflict — the key was reused with a different payload, or the resource already exists */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
             };
         };
     };
     parameters: {
         /** @description page size (default 25, max 100) */
         PageLimit: number;
-        /** @description opaque keyset cursor from a prior page's nextCursor */
+        /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
         PageBefore: string;
+        /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+        PageOrder: "asc" | "desc";
+        /** @description case-insensitive substring search over the list's reference/identifier columns */
+        SearchQuery: string;
+        /** @description opaque client-chosen key; retrying with the same key + body replays the original response, a different body returns 409 */
+        IdempotencyKey: string;
     };
     requestBodies: never;
     headers: never;
@@ -1214,31 +1384,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Balance"][];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    getBalanceSummary: {
-        parameters: {
-            query?: {
-                /** @description quote currency for the combined total */
-                quote?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BalanceSummary"];
+                    "application/json": {
+                        items: components["schemas"]["Balance"][];
+                        /** @description Always `null` — this list is returned in full (no pagination). */
+                        nextCursor: string | null;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -1249,8 +1399,12 @@ export interface operations {
             query?: {
                 from?: number;
                 to?: number;
-                limit?: number;
-                offset?: number;
+                /** @description page size (default 25, max 100) */
+                limit?: components["parameters"]["PageLimit"];
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
+                before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
             };
             header?: never;
             path?: never;
@@ -1265,8 +1419,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        orders: components["schemas"]["PayOrderRecord"][];
+                        items: components["schemas"]["PayOrderRecord"][];
+                        /** @description true count for the filtered range (independent of the page) */
                         total?: number;
+                        /** @description Response-only opaque cursor — pass it back as `before` to fetch the next page; `null` on the last page. */
+                        nextCursor: string | null;
                     };
                 };
             };
@@ -1278,8 +1435,12 @@ export interface operations {
             query?: {
                 from?: number;
                 to?: number;
-                limit?: number;
-                offset?: number;
+                /** @description page size (default 25, max 100) */
+                limit?: components["parameters"]["PageLimit"];
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
+                before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
             };
             header?: never;
             path?: never;
@@ -1294,8 +1455,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        suborders: components["schemas"]["WithdrawSuborderRecord"][];
+                        items: components["schemas"]["WithdrawSuborderRecord"][];
+                        /** @description true count for the filtered range (independent of the page) */
                         total?: number;
+                        /** @description Response-only opaque cursor — pass it back as `before` to fetch the next page; `null` on the last page. */
+                        nextCursor: string | null;
                     };
                 };
             };
@@ -1329,10 +1493,50 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listRefunds: {
+        parameters: {
+            query?: {
+                from?: number;
+                to?: number;
+                currency?: string;
+                /** @description page size (default 25, max 100) */
+                limit?: components["parameters"]["PageLimit"];
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
+                before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LedgerEntry"][];
+                        /** @description true count for the filtered range (independent of the page) */
+                        total?: number;
+                        /** @description Response-only opaque cursor — pass it back as `before` to fetch the next page; `null` on the last page. */
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     createRefund: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description opaque client-chosen key; retrying with the same key + body replays the original response, a different body returns 409 */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -1353,6 +1557,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
         };
     };
     getRefund: {
@@ -1383,7 +1588,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "Idempotency-Key"?: string;
+                /** @description opaque client-chosen key; retrying with the same key + body replays the original response, a different body returns 409 */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path?: never;
             cookie?: never;
@@ -1405,6 +1611,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
         };
     };
     listWithdrawOptions: {
@@ -1425,7 +1632,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        options: components["schemas"]["WithdrawOption"][];
+                        items: components["schemas"]["WithdrawOption"][];
+                        /** @description Always `null` — this list is returned in full (no pagination). */
+                        nextCursor: string | null;
                     };
                 };
             };
@@ -1450,6 +1659,155 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PayoutBatch"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listDepositChains: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DepositChain"][];
+                        /** @description Always `null` — this list is returned in full (no pagination). */
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createDepositAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositAddressRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositAddress"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listDeposits: {
+        parameters: {
+            query?: {
+                /** @description narrow to one network code (from GET /v1/deposits/chains) */
+                chain?: string;
+                /** @description window start, unix ms (default: now - 30 days) */
+                from?: number;
+                /** @description window end, unix ms (default: now) */
+                to?: number;
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
+                before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Deposit"][];
+                        /** @description Response-only opaque cursor — pass it back as `before` to fetch the next page; `null` on the last page. */
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listDepositAddresses: {
+        parameters: {
+            query?: {
+                /** @description narrow to one network code (from GET /v1/deposits/chains) */
+                chain?: string;
+                /** @description page size (default 25, max 100) */
+                limit?: components["parameters"]["PageLimit"];
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
+                before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DepositAddress"][];
+                        /**
+                         * @description Response-only opaque keyset cursor — you don't set it. To fetch the next page, pass this value back as the `before` query param. `null` means this was the last page.
+                         * @example eyJpZCI6IjAxSlgwUTdBQiIsInRzIjoxNzE5NzkyMDAwMDAwfQ
+                         */
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getDepositAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description network code (from GET /v1/deposits/chains) */
+                chain: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositAddress"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -1482,10 +1840,50 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    listConversions: {
+        parameters: {
+            query?: {
+                from?: number;
+                to?: number;
+                currency?: string;
+                /** @description page size (default 25, max 100) */
+                limit?: components["parameters"]["PageLimit"];
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
+                before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LedgerEntry"][];
+                        /** @description true count for the filtered range (independent of the page) */
+                        total?: number;
+                        /** @description Response-only opaque cursor — pass it back as `before` to fetch the next page; `null` on the last page. */
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     executeConversion: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description opaque client-chosen key; retrying with the same key + body replays the original response, a different body returns 409 */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -1506,6 +1904,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
         };
     };
     listSubscriptionPlans: {
@@ -1523,7 +1922,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SubscriptionPlan"][];
+                    "application/json": {
+                        items: components["schemas"]["SubscriptionPlan"][];
+                        /** @description Always `null` — this list is returned in full (no pagination). */
+                        nextCursor: string | null;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -1532,7 +1935,10 @@ export interface operations {
     createSubscriptionPlan: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description opaque client-chosen key; retrying with the same key + body replays the original response, a different body returns 409 */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -1553,6 +1959,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
         };
     };
     listSubscriptions: {
@@ -1560,8 +1967,14 @@ export interface operations {
             query?: {
                 /** @description page size (default 25, max 100) */
                 limit?: components["parameters"]["PageLimit"];
-                /** @description opaque keyset cursor from a prior page's nextCursor */
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
                 before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
+                /** @description case-insensitive substring search over the list's reference/identifier columns */
+                q?: components["parameters"]["SearchQuery"];
+                /** @description narrow to one subscription status */
+                status?: "PENDING" | "ACTIVE" | "PAST_DUE" | "COMPLETED" | "CANCELLED" | "BLOCKED";
             };
             header?: never;
             path?: never;
@@ -1584,7 +1997,10 @@ export interface operations {
     createSubscription: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description opaque client-chosen key; retrying with the same key + body replays the original response, a different body returns 409 */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -1605,6 +2021,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
         };
     };
     listDeductions: {
@@ -1624,7 +2041,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeductionOrder"][];
+                    "application/json": {
+                        items: components["schemas"]["DeductionOrder"][];
+                        /** @description Always `null` — this list is returned in full (no pagination). */
+                        nextCursor: string | null;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -1654,6 +2075,38 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listCheckouts: {
+        parameters: {
+            query?: {
+                /** @description page size (default 25, max 100) */
+                limit?: components["parameters"]["PageLimit"];
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
+                before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
+                /** @description narrow to a settlement state */
+                status?: "OPEN" | "PAID" | "EXPIRED" | "VOID";
+                /** @description case-insensitive substring search over the list's reference/identifier columns */
+                q?: components["parameters"]["SearchQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     createCheckoutLink: {
         parameters: {
             query?: never;
@@ -1663,7 +2116,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["InvoiceRequest"];
+                "application/json": components["schemas"]["CheckoutLinkRequest"];
             };
         };
         responses: {
@@ -1680,17 +2133,95 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invoice"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invoice"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listInvoices: {
         parameters: {
             query?: {
                 /** @description page size (default 25, max 100) */
                 limit?: components["parameters"]["PageLimit"];
-                /** @description opaque keyset cursor from a prior page's nextCursor */
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
                 before?: components["parameters"]["PageBefore"];
-                /** @description narrow to one manager */
-                kind?: "invoice" | "checkout";
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
                 /** @description narrow to a settlement state (e.g. PAID for the pay-ins feed) */
                 status?: "OPEN" | "PAID" | "EXPIRED" | "VOID";
+                /** @description case-insensitive substring search over the list's reference/identifier columns */
+                q?: components["parameters"]["SearchQuery"];
             };
             header?: never;
             path?: never;
@@ -1723,24 +2254,26 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Created — Invoice (no chain) or InvoiceWithAddress (chain given) */
+            /** @description Created — the invoice + its minted deposit address */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Invoice"] | components["schemas"]["InvoiceWithAddress"];
+                    "application/json": components["schemas"]["InvoiceWithAddress"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };
-    getCheckoutStats: {
+    getInvoice: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                token: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -1751,45 +2284,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CheckoutStats"];
+                    "application/json": components["schemas"]["Invoice"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
-    pauseInvoice: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    paused: boolean;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        ok: boolean;
-                        paused: boolean;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    voidInvoice: {
+    deleteInvoice: {
         parameters: {
             query?: never;
             header?: never;
@@ -1811,76 +2312,10 @@ export interface operations {
                     };
                 };
             };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    getPublicInvoice: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvoicePublic"];
-                };
-            };
             404: components["responses"]["NotFound"];
         };
     };
-    trackInvoiceOpen: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    listInvoiceAssets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssetChain"][];
-                };
-            };
-            404: components["responses"]["NotFound"];
-        };
-    };
-    quoteInvoicePayIn: {
+    updateInvoice: {
         parameters: {
             query?: never;
             header?: never;
@@ -1891,9 +2326,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    currency: string;
-                };
+                "application/json": components["schemas"]["InvoiceUpdate"];
             };
         };
         responses: {
@@ -1903,74 +2336,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PayQuote"];
+                    "application/json": components["schemas"]["Invoice"];
                 };
             };
-            404: components["responses"]["NotFound"];
-        };
-    };
-    createInvoiceDeposit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    currency: string;
-                    chain: string;
-                    fullCurrType: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DepositOrder"];
-                };
-            };
-            404: components["responses"]["NotFound"];
-        };
-    };
-    getInvoiceStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @enum {string} */
-                        status: "OPEN" | "PAID" | "EXPIRED" | "VOID";
-                        /**
-                         * @description on-chain step: detected+confirming before settled
-                         * @enum {string}
-                         */
-                        phase: "awaiting" | "confirming" | "settled";
-                        txId?: string;
-                        /** @description amount seen on-chain while confirming */
-                        received?: string;
-                    };
-                };
-            };
+            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1989,7 +2358,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Country"][];
+                    "application/json": {
+                        items: components["schemas"]["Country"][];
+                        /** @description Always `null` — this list is returned in full (no pagination). */
+                        nextCursor: string | null;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -2010,7 +2383,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Bank"][];
+                    "application/json": {
+                        items: components["schemas"]["Bank"][];
+                        /** @description Always `null` — this list is returned in full (no pagination). */
+                        nextCursor: string | null;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -2036,6 +2413,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Bank"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    deleteOffRampBank: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bankAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    submitOffRampBankMaterials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bankAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankMaterialsRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok?: boolean;
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -2071,7 +2500,10 @@ export interface operations {
     offRampWithdraw: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description opaque client-chosen key; retrying with the same key + body replays the original response, a different body returns 409 */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2092,6 +2524,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
         };
     };
     listOffRampOrders: {
@@ -2099,8 +2532,14 @@ export interface operations {
             query?: {
                 /** @description page size (default 25, max 100) */
                 limit?: components["parameters"]["PageLimit"];
-                /** @description opaque keyset cursor from a prior page's nextCursor */
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
                 before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
+                /** @description case-insensitive substring search over the list's reference/identifier columns */
+                q?: components["parameters"]["SearchQuery"];
+                /** @description narrow to one order status */
+                status?: "PENDING" | "DISPATCHED" | "SUCCESS" | "FAILED";
             };
             header?: never;
             path?: never;
@@ -2135,7 +2574,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GiftTemplate"][];
+                    "application/json": {
+                        items: components["schemas"]["GiftTemplate"][];
+                        /** @description Always `null` — this list is returned in full (no pagination). */
+                        nextCursor: string | null;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -2146,8 +2589,14 @@ export interface operations {
             query?: {
                 /** @description page size (default 25, max 100) */
                 limit?: components["parameters"]["PageLimit"];
-                /** @description opaque keyset cursor from a prior page's nextCursor */
+                /** @description Opaque keyset cursor for paging. Omit for the first page; to fetch the next page, pass the previous response's `nextCursor` here. Don't construct or parse it. */
                 before?: components["parameters"]["PageBefore"];
+                /** @description sort by creation time — desc (newest first, default) or asc (oldest first). Keyset-stable in both directions. */
+                order?: components["parameters"]["PageOrder"];
+                /** @description case-insensitive substring search over the list's reference/identifier columns */
+                q?: components["parameters"]["SearchQuery"];
+                /** @description narrow to one card status */
+                status?: "PENDING" | "ACTIVE" | "REDEEMED" | "FROZEN" | "FAILED" | "REVIEW";
             };
             header?: never;
             path?: never;
@@ -2170,7 +2619,10 @@ export interface operations {
     createGiftCard: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description opaque client-chosen key; retrying with the same key + body replays the original response, a different body returns 409 */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2191,6 +2643,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
         };
     };
     getGiftCard: {
@@ -2211,35 +2664,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GiftCard"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    listTransactions: {
-        parameters: {
-            query?: {
-                currency?: string;
-                from?: number;
-                to?: number;
-                limit?: number;
-                offset?: number;
-                format?: "json" | "csv";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LedgerPage"];
-                    "text/csv": string;
                 };
             };
             401: components["responses"]["Unauthorized"];

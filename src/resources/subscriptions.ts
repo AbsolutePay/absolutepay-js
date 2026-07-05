@@ -1,6 +1,7 @@
 import type { Requester } from "../client.js";
 import { qs } from "../client.js";
-import type { Money, Page, PageQuery } from "../types.js";
+import type { IdempotencyOptions, Money, Page, PageQuery } from "../types.js";
+import { idempotencyHeaders } from "../types.js";
 
 /** Parameters for creating a recurring billing plan (the reusable template a subscription is based on). */
 export interface CreatePlanParams {
@@ -28,63 +29,75 @@ export interface CreateSubscriptionParams {
   callbackUrl?: string;
 }
 
-/** Recurring billing: plans + subscriptions (scopes: `subscriptions:write` to mutate, `subscriptions:read` to read). */
-export class Subscriptions {
+/** Recurring billing plans — the reusable templates subscriptions are created from (scope: `subscriptions:*`). */
+export class Plans {
   constructor(private readonly c: Requester) {}
 
   /**
    * List all subscription plans (scope: `subscriptions:read`).
-   * @returns The plans payload.
+   * @returns The raw `{ items, nextCursor }` (nextCursor always `null`) of plan records.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `subscriptions:read`).
    */
-  listPlans(): Promise<Record<string, unknown>> {
+  list(): Promise<Page> {
     return this.c.request("GET", "/v1/subscription-plans");
   }
+
   /**
    * Create a recurring billing plan (scope: `subscriptions:write`).
    * @param params - The plan definition; see {@link CreatePlanParams}.
-   * @returns The created plan payload.
+   * @param opts - Optional `{ idempotencyKey }` — retrying with the same key + body replays the original.
+   * @returns The created plan record.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `subscriptions:write`, 409 duplicate `merchantPlanNo`).
    */
-  createPlan(params: CreatePlanParams): Promise<Record<string, unknown>> {
-    return this.c.request("POST", "/v1/subscription-plans", params);
+  create(params: CreatePlanParams, opts: IdempotencyOptions = {}): Promise<Record<string, unknown>> {
+    return this.c.request("POST", "/v1/subscription-plans", params, idempotencyHeaders(opts));
+  }
+}
+
+/** Recurring billing: subscriptions (+ the {@link Subscriptions.plans} sub-resource for plan templates). */
+export class Subscriptions {
+  /** Recurring billing plan templates (`plans.list` / `plans.create`). */
+  readonly plans: Plans;
+  constructor(private readonly c: Requester) {
+    this.plans = new Plans(c);
   }
 
   /**
    * List subscriptions (scope: `subscriptions:read`). Keyset-paginated.
-   * @param query - Filters + pagination. Pass a prior page's {@link Page.nextCursor} as `before`.
+   * @param query - Filters + pagination; pass a prior page's `nextCursor` as `before`.
    * @param query.status - Optional status filter (e.g. `"active"`, `"canceled"`).
-   * @param query.limit - Max items per page.
-   * @param query.before - Cursor from the previous page.
-   * @returns A {@link Page} of subscription records; `nextCursor` is `null` on the last page.
+   * @returns The raw `{ items, nextCursor }` page of subscription records.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `subscriptions:read`).
    */
   list(query: PageQuery & { status?: string } = {}): Promise<Page> {
     return this.c.request("GET", `/v1/subscriptions${qs(query)}`);
   }
+
   /**
    * Subscribe a customer to a plan (scope: `subscriptions:write`).
    * @param params - The subscription to create; see {@link CreateSubscriptionParams}.
-   * @returns The created subscription payload.
+   * @param opts - Optional `{ idempotencyKey }` — retrying with the same key + body replays the original.
+   * @returns The created subscription record.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 auth, 404 unknown plan, 409 duplicate `merchantSubNo`).
    */
-  create(params: CreateSubscriptionParams): Promise<Record<string, unknown>> {
-    return this.c.request("POST", "/v1/subscriptions", params);
+  create(params: CreateSubscriptionParams, opts: IdempotencyOptions = {}): Promise<Record<string, unknown>> {
+    return this.c.request("POST", "/v1/subscriptions", params, idempotencyHeaders(opts));
   }
 
   /**
    * Fetch the per-cycle deduction (charge) history for a subscription (scope: `subscriptions:read`).
    * @param merchantSubNo - The subscription reference (`merchantSubNo`).
-   * @returns The deduction history payload.
+   * @returns The raw `{ items, nextCursor }` (nextCursor always `null`) of deduction records.
    * @throws {AbsolutePayError} On failure (e.g. 404 unknown subscription).
    */
-  deductions(merchantSubNo: string): Promise<Record<string, unknown>> {
+  deductions(merchantSubNo: string): Promise<Page> {
     return this.c.request("GET", `/v1/subscriptions/${encodeURIComponent(merchantSubNo)}/deductions`);
   }
+
   /**
    * Cancel a subscription so no further cycles are charged (scope: `subscriptions:write`).
    * @param merchantSubNo - The subscription reference (`merchantSubNo`).
-   * @returns The updated subscription payload.
+   * @returns The updated subscription record.
    * @throws {AbsolutePayError} On failure (e.g. 404 unknown subscription, 409 already canceled).
    */
   cancel(merchantSubNo: string): Promise<Record<string, unknown>> {

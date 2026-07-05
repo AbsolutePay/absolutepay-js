@@ -1,6 +1,10 @@
 import type { Requester } from "../client.js";
 import { qs } from "../client.js";
-import type { Money, Page, PageQuery } from "../types.js";
+import type { IdempotencyOptions, Money, Page, PageQuery } from "../types.js";
+import { idempotencyHeaders } from "../types.js";
+
+/** Lifecycle status of an issued gift card. */
+export type GiftCardStatus = "PENDING" | "ACTIVE" | "REDEEMED" | "FROZEN" | "FAILED" | "REVIEW";
 
 /** Parameters for issuing a gift card. */
 export interface CreateGiftCardParams {
@@ -18,24 +22,25 @@ export class GiftCards {
 
   /**
    * List the available gift-card design templates (scope: `balances:read`).
-   * @returns The templates payload (use a template's id as {@link CreateGiftCardParams.templateId}).
+   * @returns The raw `{ items, nextCursor }` (nextCursor always `null`) of template records.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `balances:read`).
    */
-  templates(): Promise<Record<string, unknown>> {
+  templates(): Promise<Page> {
     return this.c.request("GET", "/v1/giftcards/templates");
   }
+
   /**
    * List issued gift cards (scope: `balances:read`). Keyset-paginated.
-   * @param query - Filters + pagination. Pass a prior page's {@link Page.nextCursor} as `before`.
-   * @param query.status - Optional status filter (e.g. `"active"`, `"redeemed"`).
-   * @param query.limit - Max items per page.
-   * @param query.before - Cursor from the previous page.
-   * @returns A {@link Page} of gift-card records; `nextCursor` is `null` on the last page.
+   * @param query - Filters + pagination; pass a prior page's `nextCursor` as `before`.
+   * @param query.status - Optional {@link GiftCardStatus} filter.
+   * @param query.q - Optional free-text search.
+   * @returns The raw `{ items, nextCursor }` page of gift-card records.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `balances:read`).
    */
-  list(query: PageQuery & { status?: string } = {}): Promise<Page> {
+  list(query: PageQuery & { status?: GiftCardStatus; q?: string } = {}): Promise<Page> {
     return this.c.request("GET", `/v1/giftcards${qs(query)}`);
   }
+
   /**
    * Fetch a single gift card by its card number (scope: `balances:read`).
    * @param cardNum - The gift card's number.
@@ -45,13 +50,15 @@ export class GiftCards {
   get(cardNum: string): Promise<Record<string, unknown>> {
     return this.c.request("GET", `/v1/giftcards/${encodeURIComponent(cardNum)}`);
   }
+
   /**
    * Issue a new gift card, debiting its face value from your balance (scope: `payments:write`).
    * @param params - The card to issue; see {@link CreateGiftCardParams}.
+   * @param opts - Optional `{ idempotencyKey }` — retrying with the same key + body replays the original.
    * @returns The created gift-card record.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `payments:write`, 422 insufficient balance, 404 unknown template).
    */
-  create(params: CreateGiftCardParams): Promise<Record<string, unknown>> {
-    return this.c.request("POST", "/v1/giftcards", params);
+  create(params: CreateGiftCardParams, opts: IdempotencyOptions = {}): Promise<Record<string, unknown>> {
+    return this.c.request("POST", "/v1/giftcards", params, idempotencyHeaders(opts));
   }
 }

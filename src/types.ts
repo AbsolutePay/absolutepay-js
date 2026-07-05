@@ -31,7 +31,31 @@ export type PageQuery = {
    * {@link Page.nextCursor} here. Omit (or pass `undefined`) to fetch the first page.
    */
   before?: string;
+  /**
+   * Sort direction by creation time: `"desc"` (newest first, the API default) or `"asc"` (oldest first).
+   * Optional.
+   */
+  order?: "asc" | "desc";
 };
+
+/** A request option that sets the `Idempotency-Key` header on a money-moving POST. */
+export interface IdempotencyOptions {
+  /**
+   * A unique client-generated key (e.g. a UUID). Retrying the call with the same key + body
+   * replays the original response instead of performing the action twice; a different body
+   * with the same key returns a `409`. Omit to send no idempotency key.
+   */
+  idempotencyKey?: string;
+}
+
+/**
+ * Build the `{ "Idempotency-Key": … }` header map from an options object, or `undefined`
+ * when no key was provided. Shared by every money-moving POST.
+ * @internal
+ */
+export function idempotencyHeaders(opts?: IdempotencyOptions): Record<string, string> | undefined {
+  return opts?.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : undefined;
+}
 
 /**
  * One page of results from a keyset-paginated list endpoint.

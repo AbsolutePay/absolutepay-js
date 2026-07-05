@@ -1,6 +1,10 @@
 import type { Requester } from "../client.js";
 import { qs } from "../client.js";
-import type { Page, PageQuery } from "../types.js";
+import type { IdempotencyOptions, Page, PageQuery } from "../types.js";
+import { idempotencyHeaders } from "../types.js";
+
+/** Lifecycle status of an off-ramp order. */
+export type OffRampOrderStatus = "PENDING" | "DISPATCHED" | "SUCCESS" | "FAILED";
 
 /** Inputs for an off-ramp (crypto → fiat) quote. */
 export interface OffRampQuoteParams {
@@ -64,18 +68,18 @@ export class OffRamp {
 
   /**
    * List supported off-ramp destination countries.
-   * @returns The countries payload.
+   * @returns The raw `{ items, nextCursor }` (nextCursor always `null`) of country records.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `payouts:read`).
    */
-  countries(): Promise<Record<string, unknown>> {
+  countries(): Promise<Page> {
     return this.c.request("GET", "/v1/offramp/countries");
   }
   /**
    * List the workspace's registered bank accounts (use an id as {@link OffRampWithdrawParams.bankAccountId}).
-   * @returns The bank-accounts payload.
+   * @returns The raw `{ items, nextCursor }` (nextCursor always `null`) of bank-account records.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `payouts:read`).
    */
-  banks(): Promise<Record<string, unknown>> {
+  banks(): Promise<Page> {
     return this.c.request("GET", "/v1/offramp/banks");
   }
   /**
@@ -93,7 +97,7 @@ export class OffRamp {
    * @returns Nothing on success.
    * @throws {AbsolutePayError} On failure (e.g. 404 unknown bank, 401/403 missing `payouts:write`).
    */
-  async deleteBank(bankAccountId: string): Promise<void> {
+  async removeBank(bankAccountId: string): Promise<void> {
     await this.c.request("DELETE", `/v1/offramp/banks/${encodeURIComponent(bankAccountId)}`);
   }
   /**
@@ -123,22 +127,22 @@ export class OffRamp {
   /**
    * Execute an off-ramp withdrawal against a quote, settling fiat to a bank account (scope: `payouts:write`).
    * @param params - The withdrawal; see {@link OffRampWithdrawParams}. Amounts must match the quote.
+   * @param opts - Optional `{ idempotencyKey }` — retrying with the same key + body replays the original.
    * @returns The created off-ramp order payload.
    * @throws {AbsolutePayError} On failure (e.g. 409/422 expired quote, 422 insufficient balance, 401/403 auth).
    */
-  withdraw(params: OffRampWithdrawParams): Promise<Record<string, unknown>> {
-    return this.c.request("POST", "/v1/offramp/withdraw", params);
+  withdraw(params: OffRampWithdrawParams, opts: IdempotencyOptions = {}): Promise<Record<string, unknown>> {
+    return this.c.request("POST", "/v1/offramp/withdraw", params, idempotencyHeaders(opts));
   }
   /**
    * List off-ramp orders (scope: `payouts:read`). Keyset-paginated.
-   * @param query - Filters + pagination. Pass a prior page's {@link Page.nextCursor} as `before`.
-   * @param query.status - Optional status filter.
-   * @param query.limit - Max items per page.
-   * @param query.before - Cursor from the previous page.
-   * @returns A {@link Page} of off-ramp order records; `nextCursor` is `null` on the last page.
+   * @param query - Filters + pagination; pass a prior page's `nextCursor` as `before`.
+   * @param query.status - Optional {@link OffRampOrderStatus} filter.
+   * @param query.q - Optional free-text search.
+   * @returns The raw `{ items, nextCursor }` page of off-ramp order records.
    * @throws {AbsolutePayError} On failure (e.g. 401/403 missing `payouts:read`).
    */
-  orders(query: PageQuery & { status?: string } = {}): Promise<Page> {
+  orders(query: PageQuery & { status?: OffRampOrderStatus; q?: string } = {}): Promise<Page> {
     return this.c.request("GET", `/v1/offramp/orders${qs(query)}`);
   }
 }
