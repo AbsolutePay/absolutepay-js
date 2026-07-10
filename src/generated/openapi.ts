@@ -73,7 +73,7 @@ export interface paths {
         };
         /**
          * Preview a fee
-         * @description Compute the total fee on a hypothetical amount before you transact, so you can show costs or net proceeds up front. Required query params are `amount` and `currency`; optionally pass `paymentType` (one of `CHECKOUT`, `WITHDRAWAL`, `SUBSCRIPTION`, `CONVERSION`, `OFFRAMP`, `GIFTCARD`) to price a specific flow. The response returns the total `fee`, the `net` (amount minus fee), and the two portions that make it up — your account-tier fee and the `networkFee`. This is a read-only estimate; it neither creates nor reserves anything. Needs the `balances:read` scope; returns `400` on an invalid amount or currency.
+         * @description Compute the total fee on a hypothetical amount before you transact, so you can show costs or net proceeds up front. Required query params are `amount` and `currency`; optionally pass `paymentType` (one of `CHECKOUT`, `WITHDRAWAL`, `PAYOUT`, `OFFRAMP`, `GIFTCARD`) to price a specific flow. `PAYOUT` is an alias for `WITHDRAWAL`. The response returns the total `fee` and the `net` (amount minus fee). This is a read-only estimate; it neither creates nor reserves anything. Needs the `balances:read` scope; returns `400` on an invalid amount or currency.
          */
         get: operations["previewFee"];
         put?: never;
@@ -875,16 +875,6 @@ export interface components {
              * @example 997.500000
              */
             net: string;
-            /**
-             * @description your account-tier fee portion
-             * @example 2.000000
-             */
-            markup: string;
-            /**
-             * @description network/processing fee portion
-             * @example 0.500000
-             */
-            networkFee: string;
         };
         RefundRequest: {
             /** @description the original order's trade no */
@@ -1471,7 +1461,7 @@ export interface operations {
             query: {
                 amount: string;
                 currency: string;
-                paymentType?: "CHECKOUT" | "WITHDRAWAL" | "SUBSCRIPTION" | "CONVERSION" | "OFFRAMP" | "GIFTCARD";
+                paymentType?: "CHECKOUT" | "WITHDRAWAL" | "PAYOUT" | "OFFRAMP" | "GIFTCARD";
                 tenantId?: string;
             };
             header?: never;

@@ -75,17 +75,17 @@ export interface Page<T = Record<string, unknown>> {
 }
 
 /**
- * The kind of payment a fee preview or ledger entry applies to. Each maps to a
- * distinct pricing row in the platform's fee matrix.
+ * The kind of payment a fee preview applies to.
  *
  * - `CHECKOUT` — inbound pay-in / hosted checkout collection.
  * - `WITHDRAWAL` — crypto payout / withdrawal.
- * - `SUBSCRIPTION` — recurring subscription deduction.
- * - `CONVERSION` — asset-to-asset conversion.
+ * - `PAYOUT` — alias for `WITHDRAWAL` (payouts and withdrawals share one fee).
  * - `OFFRAMP` — crypto → fiat off-ramp to a bank account.
  * - `GIFTCARD` — gift-card issuance.
+ *
+ * Conversions and subscriptions aren't previewable (their cost is a live quote / settled per cycle).
  */
-export type PaymentType = "CHECKOUT" | "WITHDRAWAL" | "SUBSCRIPTION" | "CONVERSION" | "OFFRAMP" | "GIFTCARD";
+export type PaymentType = "CHECKOUT" | "WITHDRAWAL" | "PAYOUT" | "OFFRAMP" | "GIFTCARD";
 
 /** A single asset's balance within the workspace. */
 export interface Balance {
@@ -98,8 +98,7 @@ export interface Balance {
 }
 
 /**
- * A fee quote for a prospective payment. The total {@link FeePreview.fee} is the
- * network base cost plus your account-tier markup, taken from the platform pricing matrix.
+ * A fee quote for a prospective payment. {@link FeePreview.fee} is the total charged on the amount.
  */
 export interface FeePreview {
   /** The gross amount the fee was computed on, as a decimal string (echoes the request). */
@@ -108,12 +107,8 @@ export interface FeePreview {
   currency: string;
   /** Which payment type this preview priced — see {@link PaymentType}. */
   paymentType: PaymentType;
-  /** Total fee charged (network base + markup), as a decimal string. */
+  /** Total fee charged on the amount, as a decimal string. */
   fee: string;
   /** Amount that nets out after the fee (`amount - fee`), as a decimal string. */
   net: string;
-  /** Your account-tier margin portion of the fee, as a decimal string. */
-  markup: string;
-  /** The underlying network/base fee portion, as a decimal string. */
-  networkFee: string;
 }
