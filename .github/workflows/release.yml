@@ -25,12 +25,13 @@ jobs:
       - run: bun run typecheck
       - run: bun test
       - run: bun run build
+      # Node 24 bundles npm >= 11.5.1 (has OIDC trusted publishing + provenance). Use the bundled
+      # npm directly — an in-place `npm i -g npm@latest` can prune its own deps (drops `sigstore`,
+      # breaking `--provenance`), so we avoid self-upgrading the running npm.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
-      # Trusted publishing (OIDC) needs npm >= 11.5.1; Node 22 ships an older npm, so upgrade first.
-      - run: npm install -g npm@latest
       # No token — npm authenticates via the GitHub OIDC trusted publisher.
       # Public repo → attach provenance (verifiable build → package supply-chain link).
       - name: Publish to npm (OIDC trusted publisher)
