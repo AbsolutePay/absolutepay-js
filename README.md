@@ -36,6 +36,8 @@ const ap = new AbsolutePay({
 
 const { items: balances } = await ap.balances.list();
 const preview = await ap.fees.preview({ amount: "100", currency: "USDT" });
+// Withdrawal/payout fees are per-chain — pass `chain`:
+const payoutFee = await ap.fees.preview({ amount: "100", currency: "USDT", paymentType: "WITHDRAWAL", chain: "MATIC" });
 
 // Hosted checkout — the payer picks the asset/chain on the /pay/<token> page:
 const checkout = await ap.checkouts.create({
@@ -62,7 +64,7 @@ console.log(checkout.checkoutUrl); // redirect the payer here
 | Namespace | Highlights |
 |---|---|
 | `ap.balances` | `list()` → `{ items }` |
-| `ap.fees` | `preview({ amount, currency, paymentType? })` |
+| `ap.fees` | `preview({ amount, currency, paymentType?, chain? })` — `chain` required for `WITHDRAWAL`/`PAYOUT` |
 | `ap.checkouts` | `create(...)`, `list(query)`, `get(token)`, `update(token, patch)`, `del(token)` |
 | `ap.invoices` | `create(...)` (**`chain` required**), `list(query)`, `get(token)`, `update(token, patch)`, `del(token)` |
 | `ap.deposits` | `chains()`, `createAddress({ chain })`, `addresses(query)`, `getAddress(chain)`, `list(query)` |
