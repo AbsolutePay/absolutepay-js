@@ -17,6 +17,8 @@ export interface CreatePlanParams {
   intervalCount: number;
   /** Total number of cycles to bill before the plan completes. Required. */
   totalCycles: number;
+  /** Optional free-trial length in days (0–365). When > 0 the customer authorizes but isn't charged until the trial ends; the subscription reports `TRIALING` until then. Omitted/0 charges immediately after authorization. */
+  trialDays?: number;
 }
 
 /** Parameters for subscribing a customer to an existing plan. */
