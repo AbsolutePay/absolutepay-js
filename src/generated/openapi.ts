@@ -347,7 +347,7 @@ export interface paths {
         put?: never;
         /**
          * Create a plan
-         * @description Define a reusable recurring billing plan that customers can subscribe to. The body requires `merchantPlanNo` (your reference and idempotency key), `name`, `amount`, `interval` (`DAY`, `WEEK`, `MONTH`, or `YEAR`), `intervalCount`, and `totalCycles`. Responds `201` with the created plan including its `planNo` — pass that as `planNo` when subscribing a customer. One plan can back many subscriptions, so create it once and reuse it. Send an `Idempotency-Key` header to make retries safe — the same key + body replays the original response, a different body returns `409`. Needs the `subscriptions:write` scope; returns `400` on invalid interval or amount.
+         * @description Define a reusable recurring billing plan that customers can subscribe to. The body requires `merchantPlanNo` (your reference and idempotency key), `name`, `amount`, `interval` (`DAY`, `WEEK`, `MONTH`, or `YEAR`), `intervalCount`, and `totalCycles`. Optionally set `trialDays` for a free trial — the customer authorizes but is not charged for that many days (the subscription reports the `TRIALING` status until the trial ends, then billing begins). Responds `201` with the created plan including its `planNo` — pass that as `planNo` when subscribing a customer. One plan can back many subscriptions, so create it once and reuse it. Send an `Idempotency-Key` header to make retries safe — the same key + body replays the original response, a different body returns `409`. Needs the `subscriptions:write` scope; returns `400` on invalid interval or amount.
          */
         post: operations["createSubscriptionPlan"];
         delete?: never;
@@ -964,6 +964,8 @@ export interface components {
             interval: "DAY" | "WEEK" | "MONTH" | "YEAR";
             intervalCount: number;
             totalCycles: number;
+            /** @description free-trial length in days; omitted/0 = charge immediately after authorization */
+            trialDays?: number;
         };
         SubscriptionPlan: {
             merchantPlanNo: string;
@@ -977,6 +979,8 @@ export interface components {
             interval: "DAY" | "WEEK" | "MONTH" | "YEAR";
             intervalCount: number;
             totalCycles: number;
+            /** @description free-trial length in days, if set */
+            trialDays?: number;
             /** Format: int64 */
             createdAt?: number;
         };
@@ -992,10 +996,12 @@ export interface components {
             /** @description the subscription order number */
             subId: string;
             /** @enum {string} */
-            status: "PENDING" | "ACTIVE" | "PAST_DUE" | "COMPLETED" | "CANCELLED" | "BLOCKED";
+            status: "PENDING" | "TRIALING" | "ACTIVE" | "PAST_DUE" | "COMPLETED" | "CANCELLED" | "BLOCKED";
             planNo: string;
             /** @description hosted customer authorization link */
             subscribeUrl?: string;
+            /** @description the API key that created this subscription; absent when created via the dashboard */
+            appId?: string;
             /** Format: int64 */
             createdAt?: number;
         };
@@ -1964,7 +1970,7 @@ export interface operations {
                 /** @description case-insensitive substring search over the list's reference/identifier columns */
                 q?: components["parameters"]["SearchQuery"];
                 /** @description narrow to one subscription status */
-                status?: "PENDING" | "ACTIVE" | "PAST_DUE" | "COMPLETED" | "CANCELLED" | "BLOCKED";
+                status?: "PENDING" | "TRIALING" | "ACTIVE" | "PAST_DUE" | "COMPLETED" | "CANCELLED" | "BLOCKED";
             };
             header?: never;
             path?: never;
